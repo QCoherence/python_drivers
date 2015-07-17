@@ -244,11 +244,14 @@ class SMB100A(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('output?')
+        
+        # Output can be '0', '1' or '0\n', '1\n' which are different strings.
+        # By using int() we can only get 1 or 0 independently of the OS.
+        stat = int(self._visainstrument.ask('output?'))
 
-        if (stat=='1\n'):
+        if stat == 1:
           return 'on'
-        elif (stat=='0\n'):
+        elif stat == 0:
           return 'off'
         else:
           raise ValueError('Output status not specified : %s' % stat)
@@ -308,11 +311,13 @@ class SMB100A(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get frequency sweep mode status')
-        stat = self._visainstrument.ask('SWE:RUNN?')
+        # Output can be '0', '1' or '0\n', '1\n' which are different strings.
+        # By using int() we can only get 1 or 0 independently of the OS.
+        stat = int(self._visainstrument.ask('SWE:RUNN?'))
 
-        if (stat=='1\n'):
+        if stat == 1:
           return 'on'
-        elif (stat=='0\n'):
+        elif stat == 0:
           return 'off'
         else:
           raise ValueError('Output status not specified : %s' % stat)
@@ -466,11 +471,14 @@ class SMB100A(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get power sweep mode status')
-        stat = self._visainstrument.ask('SWEep:POWer:RUNNing?')
+        # Output can be '0', '1' or '0\n', '1\n' which are different strings.
+        # By using int() we can only get 1 or 0 independently of the OS.
+        stat = int(self._visainstrument.ask('SWEep:POWer:RUNNing?'))
 
-        if (stat=='1\n'):
+        if stat == 1:
           return 'on'
-        elif (stat=='0\n'):
+        elif stat == 0:
+          return 'off'
           return 'off'
         else:
           raise ValueError('Output status not specified : %s' % stat)
