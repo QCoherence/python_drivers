@@ -364,13 +364,13 @@ class ZNB20V2(Instrument):
         '''
         logging.debug(__name__ + ' : The link of the trigger is set to %s' % link)
         if link.upper() in ('SWE'):
-            self._visainstrument.write('TRIG:LINK'+str('SWE'))
+            self._visainstrument.write("TRIG:LINK 'SWE'")
         elif link.upper() in ('SEGM'):
-            self._visainstrument.write('TRIG:LINK'+str('SEGM'))
+            self._visainstrument.write("TRIG:LINK 'SEGM'")
         elif link.upper() in ('POIN'):
-            self._visainstrument.write('TRIG:LINK'+str('POIN'))
+            self._visainstrument.write("TRIG:LINK 'POIN'")
         elif link.upper() in ('PPOIN'):
-            self._visainstrument.write('TRIG:LINK'+str('PPOIN'))			
+            self._visainstrument.write("TRIG:LINK 'PPOIN'")			
         else:
             raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPOIN')		
 	
@@ -460,7 +460,7 @@ class ZNB20V2(Instrument):
         '''
         
         logging.info(__name__+' : Set the frequency of the instrument')
-        self._visainstrument.write('frequency:span '+str(stopfrequency))
+        self._visainstrument.write('frequency:span '+str(frequencyspan))
 
 
     def do_get_frequencyspan(self):
