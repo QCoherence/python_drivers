@@ -363,14 +363,8 @@ class ZNB20V2(Instrument):
             None
         '''
         logging.debug(__name__ + ' : The link of the trigger is set to %s' % link)
-        if link.upper() in ('SWE'):
-            self._visainstrument.write("TRIG:LINK 'SWE'")
-        elif link.upper() in ('SEGM'):
-            self._visainstrument.write("TRIG:LINK 'SEGM'")
-        elif link.upper() in ('POIN'):
-            self._visainstrument.write("TRIG:LINK 'POIN'")
-        elif link.upper() in ('PPOIN'):
-            self._visainstrument.write("TRIG:LINK 'PPOIN'")			
+        if link.upper() in ('SWE', 'SEGM', 'POIN', 'PPOIN'):
+            self._visainstrument.write("TRIG:LINK '"+str(link.upper())+"'")
         else:
             raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPOIN')		
 	
