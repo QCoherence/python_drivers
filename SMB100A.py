@@ -434,6 +434,18 @@ class SMB100A(Instrument):
         self._visainstrument.write('SWE:STEP '+str(float(stepfreq))+'GHz')
     
 		
+    def set_pointsfreq(self,pointsfreq):
+        '''
+        Define the number of points of the frequency sweep in linear spacing mode.
+        The step is changed accordingly in order to keep the start frequency and the stop frequency constant
+        
+        Input:
+            pointsfreq (integer): number of points of the sweep
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : Number of points for the frequency sweep is set to %s' % pointsfreq)
+        self._visainstrument.write('SWE:POIN '+str(int(pointsfreq)))        
 #########################################################
 #
 #
