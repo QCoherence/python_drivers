@@ -196,6 +196,23 @@ class ZNB20V2(Instrument):
 
 
     def create_traces(self, traces, Sparams):
+        """
+            Create traces in the SNB
+            Input:
+                - traces (tuple): Name of the traces from which we get data.
+                                  Should be a tuple of string.
+                                  ('trace1', 'trace2', ...)
+                                  If only one trace write ('trace1',) to
+                                  have a tuple.
+                - Sparams (tuple): S parameters we want to acquire.
+                                   Should be a tuple of string.
+                                   ('Sparams', 'Sparams', ...)
+                                   If only one S parameter, write ('Sparam1',)
+                                   to have a tuple.
+
+            Output:
+                - None
+        """
 
 
         # We check if parameters are tupples
@@ -301,6 +318,24 @@ class ZNB20V2(Instrument):
 
 
     def get_traces(self, traces, data_format = 'db-phase'):
+        """
+            Return data given by the ZNB in the asked format.
+            Input:
+                - traces (tuple): Name of the traces from which we get data.
+                                  Should be a tuple of string.
+                                  ('trace1', 'trace2', ...)
+                                  If only one trace write ('trace1',) to
+                                  have a tuple.
+                - data_format (string): must be:
+                                        'real-imag', 'db-phase', 'amp-phase'
+                                        The phase is returned in rad.
+
+            Output:
+                - Following the data_format input it returns the tupples:
+                    (a1, a2), (b1, b2), ...
+                    where a1, a2 are the db-phase, by default, of the trace1
+                    and b1, b2 of thr trace2.
+        """
 
 
         # We check if traces is tuple type
