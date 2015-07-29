@@ -276,7 +276,7 @@ class ZNB20V2(Instrument):
         """
 
         # Get data as a string
-		val = self._visainstrument.ask('calculate:Data? Sdata')
+        val = self._visainstrument.ask('calculate:Data? Sdata')
 
         # Transform the string in a numpy array
         # np.fromstring is faster than np.array
@@ -317,7 +317,7 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			return self._get_data(self, data_format = data_format)
+            return self._get_data(self, data_format = data_format)
 
     def get_2traces(self, trace1, trace2, data_format = 'db-phase'):
         '''
@@ -338,13 +338,13 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
-			a, b = self._get_data(self, data_format = data_format)
+            self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
+            a, b = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
-			c, d = self._get_data(self, data_format = data_format)
+            self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
+            c, d = self._get_data(self, data_format = data_format)
 
-			return (a, b), (c, d)
+            return (a, b), (c, d)
 
 
     def get_4traces(self, trace1, trace2, trace3, trace4,
@@ -367,19 +367,21 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
-			a, b = self._get_data(self, data_format = data_format)
+            self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
+            a, b = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
-			c, d = self._get_data(self, data_format = data_format)
+            self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
+            c, d = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' % (trace3))
-			e, f = self._get_data(self, data_format = data_format)
+            self._visainstrument.write('calc:parameter:sel "%s"' % (trace3))
+            e, f = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' % (trace4))
-			g, h = self._get_data(self, data_format = data_format)
+            self._visainstrument.write('calc:parameter:sel "%s"' % (trace4))
+            g, h = self._get_data(self, data_format = data_format)
 
-			return (a, b), (c, d), (e, f), (g, h)
+            return (a, b), (c, d), (e, f), (g, h)
+
+
 
 
     def averageclear(self):
@@ -398,7 +400,7 @@ class ZNB20V2(Instrument):
 
     def set_trigger(self, trigger='IMM'):
         '''
-    	Define the source of the trigger: IMMediate (free run measurement or
+        Define the source of the trigger: IMMediate (free run measurement or
         untriggered), EXTernal, MANual or MULTiple
 
         Input:
@@ -436,7 +438,7 @@ class ZNB20V2(Instrument):
 
     def set_sweeptype(self, sweeptype = 'LIN'):
         '''
-    	Define the type of the sweep:
+        Define the type of the sweep:
         LINear | LOGarithmic | POWer | CW | POINt | SEGMent
 
         Input:
@@ -723,7 +725,7 @@ class ZNB20V2(Instrument):
         elif stat=='0':
           return 'off'
         else:
-		  raise ValueError('Output status not specified : %s' % stat)
+          raise ValueError('Output status not specified : %s' % stat)
 
     def do_set_averagestatus(self, status = 'off'):
         '''
