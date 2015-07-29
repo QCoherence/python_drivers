@@ -281,7 +281,43 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('*CLS')
         self._visainstrument.write('INITiate1:IMMediate; *OPC')
 
-    def gettrace(self):
+
+    def _get_data(self, data_format = 'real-imag'):
+        """
+            Return data given by the ZNB in the asked format.
+            Input:
+                - data_format (string): must be:
+                                        'real-imag', 'db-phase', 'amp-phase'
+                                        The phase is returned in rad.
+
+            Output:
+                - Following the data_format input it returns the tupples:
+                    real, imag
+                    db, phase
+                    amp, phase
+        """
+
+        # Get data as a string
+		val = self._visainstrument.ask('calculate:Data? Sdata')
+
+        # Transform the string in a numpy array
+        # np.fromstring is faster than np.array
+        val = np.fromstring(dstring, sep = ',')
+
+        # Change the shape of the array to get the real an imaginary part
+        real, imag = np.transpose(np.reshape(val, (-1, 2)))
+
+        if data_format.lower() == 'real-imag':
+            real, imag
+        elif data_format.lower() == 'db-phase':
+            20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+        elif data_format.lower() == 'amp-phase':
+            abs(real + 1j*imag), np.angle(real + 1j*imag)
+        else:
+            raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
+
+
+    def gettrace(self, ):
         '''
         reades a trace from znb
 
@@ -300,12 +336,8 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real, im     = np.reshape(np.array(dstringclean.split(','),
-                                               dtype = float),
-                                      (-1,2)).T
-			return real + im*1j
+            real, imag = self._get_data(self, data_format = 'real-imag')
+			return real + imag*1j
 
     def get2trace(self, trace1, trace2):
         '''
@@ -327,20 +359,12 @@ class ZNB20V2(Instrument):
             qt.msleep(0.1)
         else:
 			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real1,im1    = np.reshape(np.array(dstringclean.split(','),
-                                           dtype = float),
-                                  (-1,2)).T
+			real1 ,imag1 = self._get_data(self, data_format = 'real-imag')
 
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real2,im2    = np.reshape(np.array(dstringclean.split(','),
-                                           dtype = float),
-                                  (-1,2)).T
+			self._visainstrument.write('calc:parameter:sel "%s"' %(trace2))
+			real2, imag2 = self._get_data(self, data_format = 'real-imag')
 
-			return real1+im1*1j,real2+im2*1j
+			return real1+imag1*1j,real2+imag2*1j
 
 
     def get4trace(self, trace1, trace2, trace3, trace4):
@@ -363,35 +387,19 @@ class ZNB20V2(Instrument):
             qt.msleep(0.1)
         else:
 			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real1,im1    = np.reshape(np.array(dstringclean.split(','),
-                                           dtype = float),
-                                  (-1,2)).T
+			real1, imag1 = self._get_data(self, data_format = 'real-imag')
 
 			self._visainstrument.write('calc:parameter:sel "%s"' %(trace2))
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real2,im2    = np.reshape(np.array(dstringclean.split(','),
-                                           dtype = float),
-                                  (-1,2)).T
+			real2, imag2 = self._get_data(self, data_format = 'real-imag')
 
 			self._visainstrument.write('calc:parameter:sel "%s"' %(trace3))
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real3,im3    = np.reshape(np.array(dstringclean.split(','),
-                                           dtype = float),
-                                  (-1,2)).T
+			real3, imag3 = self._get_data(self, data_format = 'real-imag')
 
 			self._visainstrument.write('calc:parameter:sel "%s"' %(trace4))
-			dstring      = self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean = dstring.split(';')[0]
-			real4,im4    = np.reshape(np.array(dstringclean.split(','),
-                                           dtype = float),
-                                  (-1,2)).T
+			real4, imag4 = self._get_data(self, data_format = 'real-imag')
 
-			return real1 + im1*1j, real2 + im2*1j,\
-                   real3 + im3*1j, real4 + im4*1j
+			return real1 + imag1*1j, real2 + imag2*1j,\
+                   real3 + imag3*1j, real4 + imag4*1j
 
 
     def averageclear(self):
