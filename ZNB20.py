@@ -924,3 +924,54 @@ class ZNB20V2(Instrument):
         else:
             raise ValueError('set_status(): can only set on or off')
         self._visainstrument.write('output %s' % status)
+
+#########################################################
+#
+#                Driving mode
+#
+#########################################################
+
+    def get_driving_mode(self):
+        '''
+        Get the driving mode see page 423 of the manual for details
+
+        Input:
+            None
+
+        Output:
+            mode (string) : 'auto', 'alternated', 'chopped'
+        '''
+
+        logging.debug(__name__ + ' : get the drving mode')
+
+        mode = self._visainstrument.write('COUP?')
+
+        if mode.lower() == 'auto':
+            return 'Auto'
+        elif mode.lower() == 'none':
+            return 'Alternated'
+        elif mode.lower() == 'all':
+            return 'Chopped'
+
+
+    def set_driving_mode(self, mode):
+        '''
+        Set the driving mode see page 423 of the manual for details
+
+        Input:
+            mode (string) : 'auto', 'alternated', 'chopped'
+
+        Output:
+            None
+        '''
+
+        logging.debug(__name__ + ' : set the drving mode to %s' % mode)
+
+        if mode.lower() == 'auto':
+            self._visainstrument.write('COUP AUTO')
+        elif mode.lower() == 'alternated':
+            self._visainstrument.write('COUP NONE')
+        elif mode.lower() == 'chopped':
+            self._visainstrument.write('COUP ALL')
+        else:
+            raise ValueError("The mode must be 'auto', 'alternated' or 'chopped'")
