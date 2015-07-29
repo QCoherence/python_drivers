@@ -260,10 +260,11 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('INITiate1:IMMediate; *OPC')
 
 
-    def _get_data(self, data_format = 'db-phase'):
+    def _get_data(self, trace, data_format = 'db-phase'):
         """
             Return data given by the ZNB in the asked format.
             Input:
+                - trace (string): Name of the trace from which we get data
                 - data_format (string): must be:
                                         'real-imag', 'db-phase', 'amp-phase'
                                         The phase is returned in rad.
@@ -274,6 +275,9 @@ class ZNB20V2(Instrument):
                     db, phase
                     amp, phase
         """
+
+        # Selects an existing trace as the active trace of the channel
+        self._visainstrument.write('calc:parameter:sel "%s"' % (trace))
 
         # Get data as a string
         val = self._visainstrument.ask('calculate:Data? Sdata')
@@ -296,91 +300,30 @@ class ZNB20V2(Instrument):
 
 
 
+    def get_traces(self, traces, data_format = 'db-phase'):
 
 
-    def get_trace(self, data_format = 'db-phase'):
-        '''
-        reades a trace from znb
+        # We check if traces is tuple type
+        if type(traces) is not tuple :
+            raise ValueError('Traces must be tuple type')
 
-        Input:
+        # We check the type of traces elements
+        if not all([type(trace) is str for trace in traces]):
+            raise ValueError('Element in traces should be string type')
 
-            trace (string)
-
-        Output:
-
-            None
-        '''
         logging.info(__name__ +\
                      ' : start to measure and wait till it is finished')
-
 
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-            return self._get_data(self, data_format = data_format)
 
-    def get_2traces(self, trace1, trace2, data_format = 'db-phase'):
-        '''
-        reades 2 traces from znb
+            temp = []
+            for trace in traces:
 
-        Input:
+                temp.append(self._get_data(trace, data_format = data_format))
 
-            trace (string)
-
-        Output:
-
-            None
-        '''
-        logging.info(__name__ +\
-                     ' : start to measure and wait till it is finished')
-
-
-        while self._visainstrument.ask('*ESR?') != '1':
-            qt.msleep(0.1)
-        else:
-            self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
-            a, b = self._get_data(self, data_format = data_format)
-
-            self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
-            c, d = self._get_data(self, data_format = data_format)
-
-            return (a, b), (c, d)
-
-
-    def get_4traces(self, trace1, trace2, trace3, trace4,
-                  data_format = 'db-phase'):
-        '''
-        reades 4 traces from znb
-
-        Input:
-
-            trace (string)
-
-        Output:
-
-            None
-        '''
-        logging.info(__name__ +\
-                     ' : start to measure and wait till it is finished')
-
-
-        while self._visainstrument.ask('*ESR?') != '1':
-            qt.msleep(0.1)
-        else:
-            self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
-            a, b = self._get_data(self, data_format = data_format)
-
-            self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
-            c, d = self._get_data(self, data_format = data_format)
-
-            self._visainstrument.write('calc:parameter:sel "%s"' % (trace3))
-            e, f = self._get_data(self, data_format = data_format)
-
-            self._visainstrument.write('calc:parameter:sel "%s"' % (trace4))
-            g, h = self._get_data(self, data_format = data_format)
-
-            return (a, b), (c, d), (e, f), (g, h)
-
+            return temp
 
 
 
