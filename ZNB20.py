@@ -137,9 +137,13 @@ class ZNB20V2(Instrument):
                            maxval      = 20,
                            type        = types.FloatType)
 
+        self.add_parameter('driving_mode',
+                           flags       = Instrument.FLAG_GETSET,
+                           option_list = ['Auto', 'Alternated', 'Chopped'],
+                           type        = types.StringType)
+
         self.add_function('get_all')
         self.add_function('reset')
-        self.add_function('create_trace')
 
         if reset :
 
@@ -189,78 +193,54 @@ class ZNB20V2(Instrument):
         self.get_status()
         self.get_cwfrequency()
 
-    def create_trace(self, trace, Sparam):
-        '''
-        creates a trace to measure Sparam and displays it
 
-        Input:
-            trace (string, Sparam ('S11','S21','S12','S22')
 
-        Output:
-            None
+    def create_traces(self, traces, Sparams):
 
-        '''
-        logging.info(__name__ + ' : create trace')
+
+        # We check if parameters are tupples
+        if type(traces) is not tuple and type(Sparams) is not tuple:
+            raise ValueError('Traces and Sparams must be tuple type')
+
+        # We check if traces and Sparam have the same length
+        if len(traces) != len(Sparams):
+            raise ValueError('Traces and Sparams must have the same length')
+
+        # We check the type of traces elements
+        if not all([type(trace) is str for trace in traces]):
+            raise ValueError('Element in traces should be string type')
+
+        # We check the type of sparams elements
+        if not all([type(Sparam) is str for Sparam in Sparams]):
+            raise ValueError('Element in Sparams should be string type')
+
+
+        logging.info(__name__ + ' : create trace(s)')
+
+        # First we erase memory
         self._visainstrument.write('calc:parameter:del:all ')
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace,Sparam))
+
+        # For each traces we want, we create
+        for trace, Sparam in zip(traces, Sparams):
+            self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
+                                       % (trace, Sparam))
+
+        # We display traces on the device
+        # First we put display on
         self._visainstrument.write('disp:wind1:stat on')
-        self._visainstrument.write('disp:wind1:trac1:feed "%s"' % trace)
+
+        # Second we display all traces
+        for i, trace in enumerate(traces):
+            self._visainstrument.write('disp:wind1:trac%s:feed "%s"
+                                       % (i + 1, trace))
+
+        # We set the update od the display on
         self._visainstrument.write('syst:disp:upd on')
+
+        # We set continuous measurement on off
+        # The measurement will be stopped after the setted number of sweep
         self._visainstrument.write('init:cont off')
 
-    def create_2trace(self, trace1, Sparam1, trace2, Sparam2):
-        '''
-        creates a trace to measure Sparam and displays it
-
-        Input:
-            trace (string, Sparam ('S11','S21','S12','S22')
-
-        Output:
-            None
-
-        '''
-        logging.info(__name__ + ' : create trace')
-        self._visainstrument.write('calc:parameter:del:all ')
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace1,Sparam1))
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace2,Sparam2))
-        self._visainstrument.write('disp:wind1:stat on')
-        self._visainstrument.write('disp:wind1:trac1:feed "%s"' % trace1)
-        self._visainstrument.write('disp:wind1:trac2:feed "%s"' % trace2)
-        self._visainstrument.write('syst:disp:upd on')
-        self._visainstrument.write('init:cont off')
-
-
-    def create_4trace(self, trace1, Sparam1, trace2, Sparam2, trace3, Sparam3, trace4, Sparam4):
-        '''
-        creates a trace to measure Sparam and displays it
-
-        Input:
-            trace (string, Sparam ('S11','S21','S12','S22')
-
-        Output:
-            None
-
-        '''
-        logging.info(__name__ + ' : create trace')
-        self._visainstrument.write('calc:parameter:del:all ')
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace1,Sparam1))
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace2,Sparam2))
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace3,Sparam3))
-        self._visainstrument.write('calc:parameter:sdef  "%s","%s"'
-                                   % (trace4,Sparam4))
-        self._visainstrument.write('disp:wind1:stat on')
-        self._visainstrument.write('disp:wind1:trac1:feed "%s"' % trace1)
-        self._visainstrument.write('disp:wind1:trac2:feed "%s"' % trace2)
-        self._visainstrument.write('disp:wind1:trac3:feed "%s"' % trace3)
-        self._visainstrument.write('disp:wind1:trac4:feed "%s"' % trace4)
-        self._visainstrument.write('syst:disp:upd on')
-        self._visainstrument.write('init:cont off')
 
     def measure(self):
         '''
