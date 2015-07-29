@@ -432,20 +432,6 @@ class ZNB20V2(Instrument):
         else:
             raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
 
-
-#########################################################
-#
-#                  Write and Read from VISA
-#
-#########################################################
-
-    def tell(self, cmd):
-        self._visainstrument.write(cmd)
-    def ask(self, cmd):
-        res= self._visainstrument.ask(cmd + '?')
-        print res
-        return res
-
 #########################################################
 #
 #                Frequency
