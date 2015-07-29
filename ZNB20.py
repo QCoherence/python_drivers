@@ -262,8 +262,6 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('syst:disp:upd on')
         self._visainstrument.write('init:cont off')
 
-
-
     def measure(self):
         '''
         creates a trace to measure Sparam and displays it
@@ -282,7 +280,7 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('INITiate1:IMMediate; *OPC')
 
 
-    def _get_data(self, data_format = 'real-imag'):
+    def _get_data(self, data_format = 'db-phase'):
         """
             Return data given by the ZNB in the asked format.
             Input:
@@ -317,7 +315,10 @@ class ZNB20V2(Instrument):
             raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
 
 
-    def gettrace(self, ):
+
+
+
+    def get_trace(self, data_format = 'db-phase'):
         '''
         reades a trace from znb
 
@@ -336,10 +337,9 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-            real, imag = self._get_data(self, data_format = 'real-imag')
-			return real + imag*1j
+			return self._get_data(self, data_format = data_format)
 
-    def get2trace(self, trace1, trace2):
+    def get_2traces(self, trace1, trace2, data_format = 'db-phase'):
         '''
         reades 2 traces from znb
 
@@ -358,16 +358,17 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
-			real1 ,imag1 = self._get_data(self, data_format = 'real-imag')
+			self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
+			a, b = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' %(trace2))
-			real2, imag2 = self._get_data(self, data_format = 'real-imag')
+			self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
+			c, d = self._get_data(self, data_format = data_format)
 
-			return real1+imag1*1j,real2+imag2*1j
+			return (a, b), (c, d)
 
 
-    def get4trace(self, trace1, trace2, trace3, trace4):
+    def get_4traces(self, trace1, trace2, trace3, trace4,
+                  data_format = 'db-phase'):
         '''
         reades 4 traces from znb
 
@@ -386,20 +387,19 @@ class ZNB20V2(Instrument):
         while self._visainstrument.ask('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
-			real1, imag1 = self._get_data(self, data_format = 'real-imag')
+			self._visainstrument.write('calc:parameter:sel "%s"' % (trace1))
+			a, b = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' %(trace2))
-			real2, imag2 = self._get_data(self, data_format = 'real-imag')
+			self._visainstrument.write('calc:parameter:sel "%s"' % (trace2))
+			c, d = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' %(trace3))
-			real3, imag3 = self._get_data(self, data_format = 'real-imag')
+			self._visainstrument.write('calc:parameter:sel "%s"' % (trace3))
+			e, f = self._get_data(self, data_format = data_format)
 
-			self._visainstrument.write('calc:parameter:sel "%s"' %(trace4))
-			real4, imag4 = self._get_data(self, data_format = 'real-imag')
+			self._visainstrument.write('calc:parameter:sel "%s"' % (trace4))
+			g, h = self._get_data(self, data_format = data_format)
 
-			return real1 + imag1*1j, real2 + imag2*1j,\
-                   real3 + imag3*1j, real4 + imag4*1j
+			return (a, b), (c, d), (e, f), (g, h)
 
 
     def averageclear(self):
