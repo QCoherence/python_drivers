@@ -458,18 +458,9 @@ class ZNB20V2(Instrument):
         '''
         logging.debug(__name__ +\
                       ' : The type of the sweep is set to %s' % sweeptype)
-        if sweeptype.upper() in ('LIN'):
-            self._visainstrument.write('SWE:TYPE LIN')
-        elif sweeptype.upper() in ('LOG'):
-            self._visainstrument.write('SWE:TYPE LOG')
-        elif sweeptype.upper() in ('POW'):
-            self._visainstrument.write('SWE:TYPE POW')
-        elif sweeptype.upper() in ('CW'):
-            self._visainstrument.write('SWE:TYPE CW')
-        elif sweeptype.upper() in ('POIN'):
-            self._visainstrument.write('SWE:TYPE POIN')
-        elif sweeptype.upper() in ('SEG'):
-            self._visainstrument.write('SWE:TYPE SEG')
+
+        if sweeptype.upper() in ('LIN', 'LOG', 'POW', 'CW', 'POIN', 'SEG'):
+            self._visainstrument.write("SWE:TYPE '"+str(sweeptype.upper())+"'")
         else:
             raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
 
