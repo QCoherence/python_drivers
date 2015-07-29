@@ -420,15 +420,8 @@ class ZNB20V2(Instrument):
         '''
         logging.debug(__name__ +\
         ' : The source of the trigger is set to %s' % trigger)
-        if trigger.upper() in ('IMM'):
-            self._visainstrument.write('TRIG:SOUR IMM')
-        elif trigger.upper() in ('EXT'):
-            self._visainstrument.write('TRIG:SOUR EXT')
-        elif trigger.upper() in ('MAN'):
-            self._visainstrument.write('TRIG:SOUR MAN')
-        elif trigger.upper() in ('MULT'):
-            self._visainstrument.write('TRIG:SOUR MULT')
-        else:
+
+        if trigger.upper() in ('IMM', 'EXT', 'MAN', 'MULT'):
             raise ValueError('set_trigger(): can only set IMM, EXT, MAN or MULT')
 
     def set_trigger_link(self, link='POIN'):
