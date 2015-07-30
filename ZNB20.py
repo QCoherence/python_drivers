@@ -195,6 +195,57 @@ class ZNB20V2(Instrument):
 
 
 
+###################################################################
+#
+#                           Initialisation
+#
+###################################################################
+
+
+
+    def initialize_one_tone_spectroscopy(self, traces, Sparams):
+
+        # Linear sweep in frequency
+        self.set_sweeptype('lin')
+
+        # Trigger to immediate
+        self.set_trigger('imm')
+
+        # We create traces in memory
+        self.create_traces(traces, Sparams)
+
+        # No partial measurement
+        self.set_driving_mode('chopped')
+
+        self.set_status('on')
+
+
+
+    def initialize_two_tone_spectroscopy(self, traces, Sparams):
+
+        # We measure all points at the sae frequency
+        self.set_sweeptype('poin')
+
+        # Trigger to external since the znb will triggered by  another device
+        self.set_trigger('ext')
+
+        # We create traces in memory
+        self.create_traces(traces, Sparams)
+
+        # We clear average
+        self.averageclear()
+
+        self.set_status('on')
+
+
+###################################################################
+#
+#                           Trace
+#
+###################################################################
+
+
+
     def create_traces(self, traces, Sparams):
         """
             Create traces in the SNB
@@ -259,23 +310,6 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('init:cont off')
 
 
-    def measure(self):
-        '''
-        creates a trace to measure Sparam and displays it
-
-        Input:
-            trace (string, Sparam ('S11','S21','S12','S22')
-
-        Output:
-            None
-
-        '''
-        logging.info(__name__ +\
-                     ' : start to measure and wait untill it is finished')
-        self._visainstrument.write('initiate:cont off')
-        self._visainstrument.write('*CLS')
-        self._visainstrument.write('INITiate1:IMMediate; *OPC')
-
 
     def _get_data(self, trace, data_format = 'db-phase'):
         """
@@ -311,7 +345,7 @@ class ZNB20V2(Instrument):
         elif data_format.lower() == 'db-phase':
             20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
         elif data_format.lower() == 'amp-phase':
-            abs(real + 1j*imag), np.angle(real + 1j*imag)
+            abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
         else:
             raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
 
@@ -359,6 +393,25 @@ class ZNB20V2(Instrument):
                 temp.append(self._get_data(trace, data_format = data_format))
 
             return temp
+
+
+    def measure(self):
+        '''
+        creates a trace to measure Sparam and displays it
+
+        Input:
+            trace (string, Sparam ('S11','S21','S12','S22')
+
+        Output:
+            None
+
+        '''
+        logging.info(__name__ +\
+                     ' : start to measure and wait untill it is finished')
+        self._visainstrument.write('initiate:cont off')
+        self._visainstrument.write('*CLS')
+        self._visainstrument.write('INITiate1:IMMediate; *OPC')
+
 
 
 
