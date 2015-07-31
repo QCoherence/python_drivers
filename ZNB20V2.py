@@ -358,22 +358,17 @@ class ZNB20V2(Instrument):
         Define the link of the trigger: SWEep (trigger event starts an entire sweep), SEGMent (trigger event starts a sweep segment), POINt (trigger event starts measurement at the next sweep point) or PPOint (trigger event starts the next partial measurement at the current or at the next sweep point).
 
         Input:
-            lin (string): SWE, SEGM, POIN or PPOIN
+            lin (string): SWE, SEGM, POIN or PPO
         Output:
             None
         '''
         logging.debug(__name__ + ' : The link of the trigger is set to %s' % link)
-        if link.upper() in ('SWE'):
-            self._visainstrument.write('TRIG:LINK'+str('SWE'))
-        elif link.upper() in ('SEGM'):
-            self._visainstrument.write('TRIG:LINK'+str('SEGM'))
-        elif link.upper() in ('POIN'):
-            self._visainstrument.write('TRIG:LINK'+str('POIN'))
-        elif link.upper() in ('PPOIN'):
-            self._visainstrument.write('TRIG:LINK'+str('PPOIN'))
-        else:
-            raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPOIN')
 
+        if link.upper() in ('SWE', 'SEGM', 'POIN', 'PPO'):
+            self._visainstrument.write("TRIG:LINK '"+str(link.upper())+"'")
+        else:
+            raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPO')
+	
     def set_sweeptype(self, sweeptype='LIN'):
         '''
     	Define the type of the sweep: LINear | LOGarithmic | POWer | CW | POINt | SEGMent
@@ -460,7 +455,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Set the frequency of the instrument')
-        self._visainstrument.write('frequency:span '+str(stopfrequency))
+        self._visainstrument.write('frequency:span '+str(frequencyspan))
 
 
     def do_get_frequencyspan(self):
