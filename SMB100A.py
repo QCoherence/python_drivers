@@ -45,30 +45,30 @@ class SMB100A(Instrument):
         '''
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
-        
-        
+        rm = visa.ResourceManager()
+
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        
-        
+
+
         self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', maxval=30.0, type=types.FloatType)
         self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-pi, maxval=pi, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('freqsweep', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('powsweep', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-        
-        
+
+
         self.add_function ('get_all')
         self.add_function('reset')
-        
+
         if reset :
-            
+
             self.reset()
-        
+
         self.get_all()
 
 ############################################################################
@@ -127,7 +127,7 @@ class SMB100A(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the intrument')
         self._visainstrument.write('frequency '+str(frequency))
 
@@ -142,9 +142,9 @@ class SMB100A(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the intrument')
-        return self._visainstrument.ask('frequency?')
+        return self._visainstrument.query('frequency?')
 
 #########################################################
 #
@@ -165,7 +165,7 @@ class SMB100A(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the intrument')
         self._visainstrument.write('power '+str(power))
 
@@ -181,9 +181,9 @@ class SMB100A(Instrument):
 
                 power (float): power at which the instrument has been tuned [dBm]
         '''
-        
+
         logging.info(__name__+' : Get the power of the intrument')
-        return self._visainstrument.ask('power?')
+        return self._visainstrument.query('power?')
 
 #########################################################
 #
@@ -204,7 +204,7 @@ class SMB100A(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the phase of the intrument')
         self._visainstrument.write('phase '+str(float(phase)*360.0/pi))
 
@@ -220,9 +220,9 @@ class SMB100A(Instrument):
 
                 phase (float): phase at which the instrument has been tuned [rad]
         '''
-        
+
         logging.info(__name__+' : Get the phase of the intrument')
-        return self._visainstrument.ask('phase?')
+        return self._visainstrument.query('phase?')
 
 
 #########################################################
@@ -244,10 +244,10 @@ class SMB100A(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get status')
-        
+
         # Output can be '0', '1' or '0\n', '1\n' which are different strings.
         # By using int() we can only get 1 or 0 independently of the OS.
-        stat = int(self._visainstrument.ask('output?'))
+        stat = int(self._visainstrument.query('output?'))
 
         if stat == 1:
           return 'on'
@@ -281,26 +281,26 @@ class SMB100A(Instrument):
 #
 #
 #########################################################
-    
+
     def do_set_freqsweep(self, freqsweep='off'):
         '''
     	Set the frequency sweep mode to 'on' or 'off'
-        
+
         Input:
             status (string): 'on' or 'off'
         Output:
             None
         '''
         logging.debug(__name__ + ' : set frequency sweep mode to %s' % freqsweep)
-                
+
         if freqsweep.upper() in ('ON'):
             self._visainstrument.write('SOURce:FREQuency:MODE SWEep')
         elif freqsweep.upper() in ('OFF'):
             self._visainstrument.write('SOURce:FREQuency:MODE CW')
         else:
-            raise ValueError('set_freqsweep(): can only set on or off')	
+            raise ValueError('set_freqsweep(): can only set on or off')
 
-			
+
     def do_get_freqsweep(self):
         '''
         Get the status of the frequency sweep mode from the instrument
@@ -313,7 +313,7 @@ class SMB100A(Instrument):
         logging.debug(__name__ + ' : get frequency sweep mode status')
         # Output can be '0', '1' or '0\n', '1\n' which are different strings.
         # By using int() we can only get 1 or 0 independently of the OS.
-        stat = int(self._visainstrument.ask('SWE:RUNN?'))
+        stat = int(self._visainstrument.query('SWE:RUNN?'))
 
         if stat == 1:
           return 'on'
@@ -323,24 +323,24 @@ class SMB100A(Instrument):
           raise ValueError('Output status not specified : %s' % stat)
         return
 
-	###################### Methods for the frequency sweep mode ########################	
-		
+	###################### Methods for the frequency sweep mode ########################
+
     def set_dwelltime(self, dwelltime=100):
         '''
     	Set the dwell time of the frequency sweep mode
-        
+
         Input:
             dwelltime (float): time between two frequency steps
         Output:
             None
         '''
         logging.debug(__name__ + ' : set the dwell time of the frequency sweep mode to %s' % dwelltime)
-        self._visainstrument.write('SWE:DWEL '+str(float(dwelltime))+ 'ms')        
+        self._visainstrument.write('SWE:DWEL '+str(float(dwelltime))+ 'ms')
 
     def set_sweepmode(self, sweepmode='single'):
         '''
     	Set the frequency sweep mode
-        
+
         Input:
             sweepmode (string): AUTO or SINGLE
         Output:
@@ -355,11 +355,11 @@ class SMB100A(Instrument):
             self._visainstrument.write('TRIG:FSW:SOUR SING')
         else:
             raise ValueError('set_sweepmode(): can only set AUTO or SINGLE')
-			
+
     def set_spacingfreq(self, spacingfreq='linear'):
         '''
     	Define the type of frequency spacing for the sweep: linear or log
-        
+
         Input:
             spacingfreq (string): linear or log
         Output:
@@ -371,36 +371,36 @@ class SMB100A(Instrument):
         elif spacingfreq.upper() in ('LOG'):
             self._visainstrument.write('SWE:SPAC LOG')
         else:
-            raise ValueError('set_spacingfreq(): can only set LINEAR or LOG')			
-            
+            raise ValueError('set_spacingfreq(): can only set LINEAR or LOG')
+
     def startsweep(self):
         '''
     	Start the frequency sweep. Valid in the 'SINGLE' sweep mode.
-        
+
         Input:
             None
         Output:
             None
         '''
         logging.debug(__name__ + ' : start the frequency sweep')
-        self._visainstrument.write('SOUR:SWE:FREQ:EXEC')	
-    
+        self._visainstrument.write('SOUR:SWE:FREQ:EXEC')
+
     def restartsweep(self):
         '''
     	Restart the frequency sweep.
-        
+
         Input:
             None
         Output:
             None
         '''
         logging.debug(__name__ + ' : restart the frequency sweep')
-        self._visainstrument.write('SOUR:SWE:RES')	
-		
+        self._visainstrument.write('SOUR:SWE:RES')
+
     def set_startfreq(self,startfreq):
         '''
     	Define the start frequency of the sweep.
-        
+
         Input:
             startfreq (float): first frequency of the sweep
         Output:
@@ -412,7 +412,7 @@ class SMB100A(Instrument):
     def set_stopfreq(self,stopfreq):
         '''
     	Define the stop frequency of the sweep.
-        
+
         Input:
             stopfreq (float): last frequency of the sweep
         Output:
@@ -424,7 +424,7 @@ class SMB100A(Instrument):
     def set_stepfreq(self,stepfreq):
         '''
     	Define the step frequency of the sweep in linear spacing mode.
-        
+
         Input:
             stepfreq (float): step frequency of the sweep in GHz
         Output:
@@ -432,8 +432,8 @@ class SMB100A(Instrument):
         '''
         logging.debug(__name__ + ' : Step frequency is set to %s' % stepfreq)
         self._visainstrument.write('SWE:STEP '+str(float(stepfreq))+'GHz')
-    
-		
+
+
 #########################################################
 #
 #
@@ -441,26 +441,26 @@ class SMB100A(Instrument):
 #
 #
 #########################################################
-    
+
     def do_set_powsweep(self, powsweep='off'):
         '''
     	Set the power sweep mode
-        
+
         Input:
             status (string): 'on' or 'off'
         Output:
             None
         '''
         logging.debug(__name__ + ' : set power sweep mode to %s' % powsweep)
-                
+
         if powsweep.upper() in ('ON'):
             self._visainstrument.write('POWer:MODE SWEep')
         elif powsweep.upper() in ('OFF'):
             self._visainstrument.write('POWer:MODE CW')
         else:
-            raise ValueError('set_powsweep(): can only set on or off')	
+            raise ValueError('set_powsweep(): can only set on or off')
 
-			
+
     def do_get_powsweep(self):
         '''
         Get the status of the power sweep mode from the instrument
@@ -473,7 +473,7 @@ class SMB100A(Instrument):
         logging.debug(__name__ + ' : get power sweep mode status')
         # Output can be '0', '1' or '0\n', '1\n' which are different strings.
         # By using int() we can only get 1 or 0 independently of the OS.
-        stat = int(self._visainstrument.ask('SWEep:POWer:RUNNing?'))
+        stat = int(self._visainstrument.query('SWEep:POWer:RUNNing?'))
 
         if stat == 1:
           return 'on'
@@ -484,24 +484,24 @@ class SMB100A(Instrument):
           raise ValueError('Output status not specified : %s' % stat)
         return
 
-	###################### Methods for the power sweep mode ########################	
-		
+	###################### Methods for the power sweep mode ########################
+
     def set_powdwelltime(self, dwelltime=100):
         '''
     	Set the dwell time of the power sweep mode
-        
+
         Input:
             dwelltime (float): time in ms between two power steps
         Output:
             None
         '''
         logging.debug(__name__ + ' : set the dwell time of the power sweep mode to %s' % dwelltime)
-        self._visainstrument.write('SWEep:POWer:DWELl '+str(float(dwelltime))+ 'ms')        
+        self._visainstrument.write('SWEep:POWer:DWELl '+str(float(dwelltime))+ 'ms')
 
     def set_powsweepmode(self, sweepmode='single'):
         '''
     	Set the power sweep mode
-        
+
         Input:
             sweepmode (string): AUTO or SINGLE
         Output:
@@ -516,35 +516,35 @@ class SMB100A(Instrument):
             self._visainstrument.write('TRIGger:PSWeep:SOURce  SING')
         else:
             raise ValueError('set_powsweepmode(): can only set AUTO or SINGLE')
-			          
+
     def powstartsweep(self):
         '''
     	Start the power sweep. Valid in the 'SINGLE' sweep mode.
-        
+
         Input:
             None
         Output:
             None
         '''
         logging.debug(__name__ + ' : start the power sweep')
-        self._visainstrument.write('SWEep:POWer:EXECute')	
-    
+        self._visainstrument.write('SWEep:POWer:EXECute')
+
     def powrestartsweep(self):
         '''
     	Restart the power sweep.
-        
+
         Input:
             None
         Output:
             None
         '''
         logging.debug(__name__ + ' : restart the power sweep')
-        self._visainstrument.write('SWEep:RESet')	
-		
+        self._visainstrument.write('SWEep:RESet')
+
     def set_startpow(self,startpow):
         '''
     	Define the start power of the sweep.
-        
+
         Input:
             startpow (float): first power value of the sweep in dBm
         Output:
@@ -556,7 +556,7 @@ class SMB100A(Instrument):
     def set_stoppow(self,stoppow):
         '''
     	Define the stop frequency of the sweep.
-        
+
         Input:
             stoppow (float): last power value of the sweep in dBm
         Output:
@@ -568,7 +568,7 @@ class SMB100A(Instrument):
     def set_steppow(self,steppow):
         '''
     	Define the power step of the sweep in dBm.
-        
+
         Input:
             steppow (float): step power of the sweep in dBm
         Output:
@@ -576,4 +576,3 @@ class SMB100A(Instrument):
         '''
         logging.debug(__name__ + ' : Step power is set to %s' % steppow)
         self._visainstrument.write('SWEep:POWer:STEP '+str(float(steppow))+'dB')
-    

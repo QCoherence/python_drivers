@@ -44,28 +44,28 @@ class HP83630A(Instrument):
         '''
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
-        
-        
+        rm = visa.ResourceManager()
+
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        
-        
+
+
         self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=26.5e9, type=types.FloatType)
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval= -20., maxval=25, type=types.FloatType)
         # self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-pi, maxval=pi, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-        
-        
+
+
         self.add_function ('get_all')
         self.add_function('reset')
-        
+
         if reset :
-            
+
             self.reset()
-        
+
         self.get_all()
 
 ############################################################################
@@ -120,7 +120,7 @@ class HP83630A(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the intrument')
         self._visainstrument.write('frequency '+str(frequency))
 
@@ -135,9 +135,9 @@ class HP83630A(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the intrument')
-        return self._visainstrument.ask('frequency?')
+        return self._visainstrument.query('frequency?')
 
 #########################################################
 #
@@ -158,7 +158,7 @@ class HP83630A(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the intrument')
         self._visainstrument.write('power '+str(power))
 
@@ -174,9 +174,9 @@ class HP83630A(Instrument):
 
                 power (float): power at which the instrument has been tuned [dBm]
         '''
-        
+
         logging.info(__name__+' : Get the power of the intrument')
-        return self._visainstrument.ask('power?')
+        return self._visainstrument.query('power?')
 
 #########################################################
 #
@@ -197,7 +197,7 @@ class HP83630A(Instrument):
             # Output:
                 # None
         # '''
-        
+
         # logging.info(__name__+' : Set the phase of the intrument')
         # self._visainstrument.write('phase '+str(float(phase)*360.0/pi))
 
@@ -213,9 +213,9 @@ class HP83630A(Instrument):
 
                 # phase (float): phase at which the instrument has been tuned [rad]
         # '''
-        
+
         # logging.info(__name__+' : Get the phase of the intrument')
-        # return self._visainstrument.ask('phase?')
+        # return self._visainstrument.query('phase?')
 
 
 #########################################################
@@ -237,7 +237,7 @@ class HP83630A(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('power:state?')
+        stat = self._visainstrument.query('power:state?')
 
         if (stat=='1'):
           return 'on'
@@ -262,4 +262,3 @@ class HP83630A(Instrument):
             self._visainstrument.write('power:state 1')
         elif status.upper() in 'OFF':
             self._visainstrument.write('power:state 0')
-        
