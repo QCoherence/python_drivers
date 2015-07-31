@@ -48,11 +48,11 @@ class ZVL13(Instrument):
         '''
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
-        
-        
+        rm = visa.ResourceManager
+
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
 
@@ -68,15 +68,15 @@ class ZVL13(Instrument):
         self.add_parameter('sweeps', flags=Instrument.FLAG_GETSET, units='', minval=1, maxval=1000, type=types.FloatType)
         self.add_parameter('measBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=10, maxval=500e3, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-        
+
         self.add_function('get_all')
         self.add_function('reset')
         self.add_function('create_trace')
-        
+
         if reset :
-            
+
             self.reset()
-        
+
         self.get_all()
 
 ############################################################################
@@ -175,11 +175,11 @@ class ZVL13(Instrument):
 
         # '''
         # logging.info(__name__ + ' : start to measure and wait till it is finished')
-        
+
        # self._visainstrument.write('*SRE 32')
        # self._visainstrument.write('*ESE 1')
         # self._visainstrument.write('init:imm; *OPC')
-    
+
 
     # def gettrace(self):
         # '''
@@ -195,27 +195,27 @@ class ZVL13(Instrument):
             # None
         # '''
         # logging.info(__name__ + ' : start to measure and wait till it is finished')
-        
+
        # counter = 0
        # while counter < 10
            # counter += 1
-           # try 
-               # dstring=self._visainstrument.ask('calculate:Data:NSweep? Sdata, 1 ')
+           # try
+               # dstring=self._visainstrument.query('calculate:Data:NSweep? Sdata, 1 ')
                # real,im= np.reshape(np.array(dstring.split(','),dtype=float),(-1,2)).T
                # break
            # except VisaIOError
                # qt.msleep(10)
        # return real+im*1j
-                
-        
+
+
         # counter=0
-        # while self._visainstrument.ask('*OPC?') != u'1\n':
+        # while self._visainstrument.query('*OPC?') != u'1\n':
             # qt.msleep(10)
             # counter +=1
             # if counter > 20:
                 # break
         # else:
-            # dstring=self._visainstrument.ask('calculate:Data:NSweep? Sdata, 1 ')
+            # dstring=self._visainstrument.query('calculate:Data:NSweep? Sdata, 1 ')
             # real,im= np.reshape(np.array(dstring.split(','),dtype=float),(-1,2)).T
             # return real+im*1j
 
@@ -235,17 +235,17 @@ class ZVL13(Instrument):
         logging.info(__name__ + ' : start to measure and wait till it is finished')
 
 
-        while self._visainstrument.ask('*ESR?') != '1\n':
+        while self._visainstrument.query('*ESR?') != '1\n':
             qt.msleep(1)
         else:
-			dstring=self._visainstrument.ask('calculate:Data:NSweep? Sdata, 1 ')
+			dstring=self._visainstrument.query('calculate:Data:NSweep? Sdata, 1 ')
 			real,im= np.reshape(np.array(dstring.split(','),dtype=float),(-1,2)).T
 			return real+im*1j
-        
+
     def averageclear(self):
         '''
         Starts a new average cycle
-		
+
 
         Input:
             None
@@ -264,8 +264,8 @@ class ZVL13(Instrument):
 #########################################################
     def tell(self, cmd):
         self._visainstrument.write(cmd)
-    def ask(self, cmd):
-        res= self._visainstrument.ask(cmd + '?')
+    def query(self, cmd):
+        res= self._visainstrument.query(cmd + '?')
         print res
         return res
 #########################################################
@@ -285,7 +285,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:center '+str(centerfrequency))
 
@@ -300,9 +300,9 @@ class ZVL13(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:center?')
+        return self._visainstrument.query('frequency:center?')
 
     def do_set_frequencyspan(self, frequencyspan=1.):
         '''
@@ -314,7 +314,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:span '+str(stopfrequency))
 
@@ -329,9 +329,9 @@ class ZVL13(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:span?')
+        return self._visainstrument.query('frequency:span?')
 
 
     def do_set_startfrequency(self, startfrequency=1.):
@@ -344,7 +344,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:start '+str(startfrequency))
 
@@ -359,9 +359,9 @@ class ZVL13(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:start?')
+        return self._visainstrument.query('frequency:start?')
 
     def do_set_stopfrequency(self, stopfrequency=1.):
         '''
@@ -373,7 +373,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:stop '+str(stopfrequency))
 
@@ -388,9 +388,9 @@ class ZVL13(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:stop?')
+        return self._visainstrument.query('frequency:stop?')
 
 
 #########################################################
@@ -412,7 +412,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the instrument')
         self._visainstrument.write('source:power '+str(power))
 
@@ -428,9 +428,9 @@ class ZVL13(Instrument):
 
                 power (float): power at which the instrument has been tuned [dBm]
         '''
-        
+
         logging.info(__name__+' : Get the power of the instrument')
-        return self._visainstrument.ask('source:power?')
+        return self._visainstrument.query('source:power?')
 
 #########################################################
 #
@@ -451,7 +451,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the averages of the instrument')
         self._visainstrument.write('average:count '+str(averages))
 
@@ -466,11 +466,11 @@ class ZVL13(Instrument):
 
             Output:
 
-                phase (float): averages of the instrument 
+                phase (float): averages of the instrument
         '''
-        
+
         logging.info(__name__+' : Get the averages of the instrument')
-        return self._visainstrument.ask('average:count?')
+        return self._visainstrument.query('average:count?')
 
     def do_get_averagestatus(self):
         """
@@ -484,7 +484,7 @@ class ZVL13(Instrument):
             status (string) : 'on' or 'off'
         """
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('average?')
+        stat = self._visainstrument.query('average?')
         if stat=='1\n':
           return 'on'
         elif stat=='0\n':
@@ -531,7 +531,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the measurement bandwidth of the instrument')
         self._visainstrument.write('sens:band '+str(measBW))
 
@@ -548,9 +548,9 @@ class ZVL13(Instrument):
 
                 BW (float): measurement bandwidth [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the BW of the instrument')
-        return self._visainstrument.ask('sens:band?')
+        return self._visainstrument.query('sens:band?')
 
 
 #########################################################
@@ -572,7 +572,7 @@ class ZVL13(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the instrument')
         self._visainstrument.write('sens:sweep:points '+str(points))
 
@@ -588,9 +588,9 @@ class ZVL13(Instrument):
 
                 BW (float): power at which the instrument has been tuned [dBm]
         '''
-        
+
         logging.info(__name__+' : Get the BW of the instrument')
-        return self._visainstrument.ask('sens:sweep:points?')
+        return self._visainstrument.query('sens:sweep:points?')
 
 #########################################################
 #
@@ -606,12 +606,12 @@ class ZVL13(Instrument):
 
 
             Input:
-                power (float): sweeps of the instrument will be tuned 
+                power (float): sweeps of the instrument will be tuned
 
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the instrument')
         self._visainstrument.write('initiate:cont Off ')
         self._visainstrument.write('sens:sweep:count '+str(sweeps))
@@ -626,11 +626,11 @@ class ZVL13(Instrument):
 
             Output:
 
-                BW (float):sweeps at which the instrument 
+                BW (float):sweeps at which the instrument
         '''
-        
+
         logging.info(__name__+' : Get the sweeps of the instrument')
-        return self._visainstrument.ask('sens:sweep:count?')
+        return self._visainstrument.query('sens:sweep:count?')
 
 #########################################################
 #
@@ -651,7 +651,7 @@ class ZVL13(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('output?')
+        stat = self._visainstrument.query('output?')
 
         if (stat=='1\n'):
           return 'on'
@@ -677,6 +677,3 @@ class ZVL13(Instrument):
         else:
             raise ValueError('set_status(): can only set on or off')
         self._visainstrument.write('output %s' % status)
-
-
-

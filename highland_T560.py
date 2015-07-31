@@ -89,7 +89,7 @@ class highland_T560(Instrument):
             minval=0, maxval=1e10,
             units='ns'
             )
-            
+
         self.add_parameter('polarity',
             type=types.StringType,
             option_list=['POS','NEG'],
@@ -115,7 +115,7 @@ class highland_T560(Instrument):
             # minval=1,
             # units='none'
             # )
-        
+
 
         if reset:
             self._reset()
@@ -123,12 +123,12 @@ class highland_T560(Instrument):
         self.get_all()
 
 
-    def ask(self, msg):
-        return self._ask(msg)
+    def query(self, msg):
+        return self._query(msg)
 
-    def _ask(self, msg, buffer=1024):
+    def _query(self, msg, buffer=1024):
         sout = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sout.settimeout(5)
+        sout.settimeout(5) # we may have to change 5 into 5000?
         sout.connect((self._host, self._port))
         sout.sendall(msg+'\r')
         return sout.recvfrom(buffer)[0]
@@ -136,85 +136,85 @@ class highland_T560(Instrument):
     def reset(self):
         self._reset()
     def _reset(self):
-        self._ask('LOAD DEFAULT')
+        self._query('LOAD DEFAULT')
         self._initialize()
 
     def _initialize(self):
 
-#        self._ask('TRIGGER SYN')
+#        self._query('TRIGGER SYN')
 
-        self._ask('AUTOINSTALL 1')
-#        self._ask('TLevel 2.5')
-        self._ask('CLOCK IN')
-        self._ask('TRIGGER INT')
-#        self._ask('TRIGGER POS')
-        self._ask('VERBOSE 0')
-        self._ask('TDIV 88')
-        
-        self.ask('adelay 0n')
-        self.ask('bdelay 0n')
-        self.ask('cdelay 0n')
-        self.ask('ddelay 0n')
-        
-        self.ask('awidth 0n')
-        self.ask('bwidth 0n')
-        self.ask('cwidth 0n')
-        self.ask('dwidth 0n')
-        
-        self.ask('aset POS')
-        self.ask('bset POS')
-        self.ask('cset POS')
-        self.ask('dset POS')
-        
-        
+        self._query('AUTOINSTALL 1')
+#        self._query('TLevel 2.5')
+        self._query('CLOCK IN')
+        self._query('TRIGGER INT')
+#        self._query('TRIGGER POS')
+        self._query('VERBOSE 0')
+        self._query('TDIV 88')
+
+        self.query('adelay 0n')
+        self.query('bdelay 0n')
+        self.query('cdelay 0n')
+        self.query('ddelay 0n')
+
+        self.query('awidth 0n')
+        self.query('bwidth 0n')
+        self.query('cwidth 0n')
+        self.query('dwidth 0n')
+
+        self.query('aset POS')
+        self.query('bset POS')
+        self.query('cset POS')
+        self.query('dset POS')
+
+
 
     def get_all(self):
         self.get_chA_delay()
         self.get_chB_delay()
         self.get_chC_delay()
         self.get_chD_delay()
-        
+
         self.get_chA_width()
         self.get_chB_width()
         self.get_chC_width()
         self.get_chD_width()
-        
+
         self.get_chA_status()
         self.get_chB_status()
         self.get_chC_status()
         self.get_chD_status()
-        
+
         self.get_chA_polarity()
         self.get_chB_polarity()
         self.get_chC_polarity()
         self.get_chD_polarity()
-        
+
         self.get_period()
 
 #    def do_get_delay(self, channel):
-#        return 1e9*float(self._ask(channel+'DELAY'))
+#        return 1e9*float(self._query(channel+'DELAY'))
 
 #    def do_set_delay(self, val,channel):
 #        print channel
 #        msg= '{}Delay {:.2f}'.format(channel,val)
-#        self._ask(msg)
+#        self._query(msg)
 #        self.set_period(self.get_period(query=False), update = False, channel=channel, param='delay', param_val=val)
 
     def do_get_status(self,channel):
-        return self._ask(channel+'SET').split(' ')[5]
+        return self._query(channel+'SET').split(' ')[5]
 
     def do_set_status(self,s,channel):
         if s.upper() in  ['ON','OFF']:
-            self._ask(channel +'SET '+ s.upper())
+            self._query(channel +'SET '+ s.upper())
         else:
             pass
 
     def do_get_polarity(self,channel):
-        return self._ask(channel+'SET').split(' ')[3]
+        return self._query(channel+'SET').split(' ')[3]
 
     def do_set_polarity(self,pol,channel):
         if pol.upper() in  ['POS','NEG']:
-            self._ask(channel +'SET '+ pol.upper())
+            self._query(channel +'SET '+ pol.upper())
         else:
             pass
 
@@ -225,9 +225,9 @@ class highland_T560(Instrument):
                 Input:
                     - delay (float) : delay in nanosecond
         """
-        
+
         if delay + self.do_get_chA_width() < self.do_get_period()*self.do_get_trigDiv() - 50 :
-            self._ask('adelay '+str(delay)+'n')
+            self._query('adelay '+str(delay)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -238,9 +238,9 @@ class highland_T560(Instrument):
                 Input:
                     - delay (float) : delay in nanosecond
         """
-        
+
         if delay + self.do_get_chB_width() < self.do_get_period() *self.do_get_trigDiv()- 50 :
-            self._ask('bdelay '+str(delay)+'n')
+            self._query('bdelay '+str(delay)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -251,9 +251,9 @@ class highland_T560(Instrument):
                 Input:
                     - delay (float) : delay in nanosecond
         """
-        
+
         if delay + self.do_get_chC_width() < self.do_get_period() - 50 :
-            self._ask('cdelay '+str(delay)+'n')
+            self._query('cdelay '+str(delay)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -264,9 +264,9 @@ class highland_T560(Instrument):
                 Input:
                     - delay (float) : delay in nanosecond
         """
-        
+
         if delay + self.do_get_chD_width() < self.do_get_period() - 50 :
-            self._ask('ddelay '+str(delay)+'n')
+            self._query('ddelay '+str(delay)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -278,8 +278,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - delay (float) : delay in nanosecond
         """
-        
-        return float(self._ask('adelay'))*1e9
+
+        return float(self._query('adelay'))*1e9
 
 
 
@@ -289,8 +289,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - delay (float) : delay in nanosecond
         """
-        
-        return float(self._ask('bdelay'))*1e9
+
+        return float(self._query('bdelay'))*1e9
 
 
 
@@ -300,8 +300,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - delay (float) : delay in nanosecond
         """
-        
-        return float(self._ask('cdelay'))*1e9
+
+        return float(self._query('cdelay'))*1e9
 
 
 
@@ -311,8 +311,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - delay (float) : delay in nanosecond
         """
-        
-        return float(self._ask('ddelay'))*1e9
+
+        return float(self._query('ddelay'))*1e9
 
 
 
@@ -324,7 +324,7 @@ class highland_T560(Instrument):
         """
 
         if width + self.do_get_chA_delay() < self.do_get_period()*self.do_get_trigDiv() - 50 :
-            self._ask('awidth '+str(width)+'n')
+            self._query('awidth '+str(width)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -335,9 +335,9 @@ class highland_T560(Instrument):
                 Input:
                     - width (float) : width in nanosecond
         """
-        
+
         if width + self.do_get_chB_delay() < self.do_get_period() - 50 :
-            self._ask('bwidth '+str(width)+'n')
+            self._query('bwidth '+str(width)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -351,7 +351,7 @@ class highland_T560(Instrument):
         """
 
         if width + self.do_get_chC_delay() < self.do_get_period() - 50 :
-            self._ask('cwidth '+str(width)+'n')
+            self._query('cwidth '+str(width)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -365,7 +365,7 @@ class highland_T560(Instrument):
         """
 
         if width + self.do_get_chD_delay() < self.do_get_period() - 50 :
-            self._ask('dwidth '+str(width)+'n')
+            self._query('dwidth '+str(width)+'n')
         else:
             raise ValueError('The period is too short to contain your pulse.')
 
@@ -377,8 +377,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - width (float) : width in nanosecond
         """
-        
-        return float(self._ask('awidth'))*1e9
+
+        return float(self._query('awidth'))*1e9
 
 
 
@@ -388,8 +388,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - width (float) : width in nanosecond
         """
-        
-        return float(self._ask('bwidth'))*1e9
+
+        return float(self._query('bwidth'))*1e9
 
 
 
@@ -399,8 +399,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - width (float) : width in nanosecond
         """
-        
-        return float(self._ask('cwidth'))*1e9
+
+        return float(self._query('cwidth'))*1e9
 
 
 
@@ -410,8 +410,8 @@ class highland_T560(Instrument):
                 Ouput:
                     - width (float) : width in nanosecond
         """
-        
-        return float(self._ask('dwidth'))*1e9
+
+        return float(self._query('dwidth'))*1e9
 
 
 
@@ -421,9 +421,9 @@ class highland_T560(Instrument):
                 # Input:
                     # - period_multiplier (int) : period multiplier (dimensionless)
         # """
-        
-        
-        # self._ask('tdiv '+str(period_multiplier))
+
+
+        # self._query('tdiv '+str(period_multiplier))
         # self.get_period(self)
 
     # def do_get_period_multiplier(self):
@@ -432,42 +432,42 @@ class highland_T560(Instrument):
                 # Output:
                     # - period_multiplier (int) : period multiplier (dimensionless)
         # """
-        
-        # return int(self._ask('tdiv'))
-        
+
+        # return int(self._query('tdiv'))
+
 
     def do_set_period(self, period):
         """
             Set the closest period available with the Highland.
-            
+
             Input:
                 - period (Float): Period of the pulser in [ns].
-            
+
             Output:
                 - None
         """
-        
+
         #We get the mutlplier of the internal clock
         #The minimal step in time is 12.5ns
         #The minimal step in multiplier is 8
         multiplier = round(period/12.5/8.)
-        
+
         #We calculate the Tdiv to set
         tdiv = multiplier*8.
         period = tdiv * 12.5
-        
+
         conditions = np.array([ self.get_chA_delay() + self.get_chA_width(),
-                                self.get_chB_delay() + self.get_chB_width(), 
-                                self.get_chC_delay() + self.get_chC_width(), 
+                                self.get_chB_delay() + self.get_chB_width(),
+                                self.get_chC_delay() + self.get_chC_width(),
                                 self.get_chD_delay() + self.get_chD_width()])
-        
+
         booleenCondition = conditions > period
-            
+
         #Next we check if the period is longer than all channel width + delay
         if booleenCondition.any():
             raise ValueError('Period too short to contain the channel: '+str(self._channels[conditions.argmax()]))
         else:
-            self._ask('tdiv '+str(tdiv))
+            self._query('tdiv '+str(tdiv))
 
 
 
@@ -477,7 +477,7 @@ class highland_T560(Instrument):
                 Input:
                     - period (float) : period in nanoseconds
         """
-        return float(self._ask('tdiv'))*12.5
+        return float(self._query('tdiv'))*12.5
 
 #    def do_set_period(self,val, update=True, channel=None, param=None, param_val=None):
 #        up = update
@@ -506,10 +506,10 @@ class highland_T560(Instrument):
 #        if freq > 16e6:
 #            freq = 16e6
 #        if up:
-#            self._ask('SY {:.2f}'.format(freq))
+#            self._query('SY {:.2f}'.format(freq))
 
 
 
 
     def do_get_trigDiv(self):
-        return float(self._ask('TD'))
+        return float(self._query('TD'))

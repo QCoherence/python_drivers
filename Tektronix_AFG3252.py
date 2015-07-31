@@ -49,19 +49,19 @@ class Tektronix_AFG3252(Instrument):
         Output:
             None
         '''
-        
+
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
-
+        rm = visa.ResourceManager
 
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        
-        
-        
+
+
+
         self.add_parameter('period_ch1', flags=Instrument.FLAG_GETSET, units='s', minval=16.67e-9, maxval=1e3, type=types.FloatType)
         self.add_parameter('amplitude_ch1', flags=Instrument.FLAG_GETSET, units='V', minval=0.05, maxval=5.0, type=types.FloatType)
         self.add_parameter('offset_ch1', flags=Instrument.FLAG_GETSET, units='V', minval=-2.5, maxval=2.5, type=types.FloatType)
@@ -70,23 +70,23 @@ class Tektronix_AFG3252(Instrument):
         self.add_parameter('ncycles_ch1', minval=1, maxval= 1000000, flags=Instrument.FLAG_GETSET, type=types.IntType)
         self.add_parameter('interval', minval=1e-3, maxval= 500, units='s', flags=Instrument.FLAG_GETSET, type=types.FloatType)
         self.add_parameter('reference', option_list=['Internal', 'External'], flags=Instrument.FLAG_GETSET, type=types.StringType)
-        
+
 #        self.add_function('get_all')
         self.add_function('reset')
-        
+
         self.maxpoint = 131072
         self.maxrate = 2e9
-        
+
         self.max_offset = 2.5
         self.min_offset = -2.5
-        
+
         self.max_amplitude = 5.
         self.min_amplitude = 0.05
-        
+
         if reset :
-            
+
             self.reset()
-        
+
         self.get_all()
 
     # Functions
@@ -135,7 +135,7 @@ class Tektronix_AFG3252(Instrument):
             Output:
                 maxpoint (int) : the max number of point that the tektro can handle
         '''
-        
+
         return self.maxpoint
 
 
@@ -149,7 +149,7 @@ class Tektronix_AFG3252(Instrument):
             Output:
                 maxrate (int) : the max rate of the tektro
         '''
-        
+
         return self.maxrate
 
 
@@ -173,7 +173,7 @@ class Tektronix_AFG3252(Instrument):
             interval (float) : The interval between each cycle
         '''
         logging.debug(__name__ + ' : Get the interval between each cycle')
-        return float(self._visainstrument.ask('trigger:timer?'))
+        return float(self._visainstrument.query('trigger:timer?'))
 
 
 
@@ -212,7 +212,7 @@ class Tektronix_AFG3252(Instrument):
             ncycle (Int) : The number of cycle per period of the channel 1
         '''
         logging.debug(__name__ + ' : Get the number of cycle per period for the channel  1')
-        return float(self._visainstrument.ask('source1:burst:ncycles?'))
+        return float(self._visainstrument.query('source1:burst:ncycles?'))
 
 
     def do_set_ncycles_ch1(self, ncycles=0):
@@ -251,7 +251,7 @@ class Tektronix_AFG3252(Instrument):
             Offset (Float) : The offset of the channel 1 in Volts
         '''
         logging.debug(__name__ + ' : Get offset of channel  1')
-        return float(self._visainstrument.ask('SOURCE1:VOLTAGE:LEVEL:IMMEDIATE:OFFSET?'))
+        return float(self._visainstrument.query('SOURCE1:VOLTAGE:LEVEL:IMMEDIATE:OFFSET?'))
 
 
     def do_set_offset_ch1(self, offset=0):
@@ -287,10 +287,10 @@ class Tektronix_AFG3252(Instrument):
         Output:
             amplitude (Float) : The amplitude of the channel 1 in Volts, peak to peak
         '''
-        
+
         logging.debug(__name__ + ' : Get amplitude of channel  1')
-        
-        return float(self._visainstrument.ask('source1:voltage:level:immediate:amplitude?'))
+
+        return float(self._visainstrument.query('source1:voltage:level:immediate:amplitude?'))
 
 
     def do_set_amplitude_ch1(self, amplitude=0.1):
@@ -327,7 +327,7 @@ class Tektronix_AFG3252(Instrument):
             phase (Float) : The phase of the channel 1 [rad]
         '''
         logging.debug(__name__ + ' : Get phase of channel  1')
-        return float(self._visainstrument.ask('source1:phase?'))
+        return float(self._visainstrument.query('source1:phase?'))
 
 
     def do_set_phase_ch1(self, phase=0.0):
@@ -364,7 +364,7 @@ class Tektronix_AFG3252(Instrument):
             frequency (Float) : The frequency of the channel 1 in Hertz
         '''
         logging.debug(__name__ + ' : Get frequency of channel 1')
-        return float(self._visainstrument.ask('source1:frequency?'))
+        return float(self._visainstrument.query('source1:frequency?'))
 
 
     def set_frequency_ch1(self, frequency=1e6):
@@ -401,7 +401,7 @@ class Tektronix_AFG3252(Instrument):
             period (Float) : The frequency of the channel 1 in Hertz
         '''
         logging.debug(__name__ + ' : Get period of channel 1')
-        return float(self._visainstrument.ask('source1:pulse:period?'))
+        return float(self._visainstrument.query('source1:pulse:period?'))
 
 
     def do_set_period_ch1(self, period=1):
@@ -467,13 +467,13 @@ class Tektronix_AFG3252(Instrument):
         Output:
             None
         '''
-        
+
         if int(number_cycle) == 0:
-            
+
             logging.debug(__name__ + ' : Set the number of cycle of the burst mode for the channel 1')
             self._visainstrument.write('source1:burst:ncycles infinity')
         else:
-            
+
             logging.debug(__name__ + ' : Set the number of cycle of the burst mode for the channel 1')
             self._visainstrument.write('source1:burst:ncycles  %.6f' % (int(number_cycle)))
 
@@ -600,7 +600,7 @@ class Tektronix_AFG3252(Instrument):
             None
         '''
         logging.debug(__name__ + ' :  Set channel 1 output on/off')
-        
+
         if state.lower() == 'on':
             self._visainstrument.write('output1:state 1')
         elif state.lower() == 'off':
@@ -620,8 +620,8 @@ class Tektronix_AFG3252(Instrument):
             None
         '''
         logging.debug(__name__ + ' :  Get state of the channel 1 output on/off')
-        
-        if self._visainstrument.ask('output1:state?') == '1':
+
+        if self._visainstrument.query('output1:state?') == '1':
             return 'on'
         else :
             return 'off'
@@ -647,7 +647,7 @@ class Tektronix_AFG3252(Instrument):
             None
         '''
         logging.debug(__name__ + ' :  Set the clock')
-        
+
         if val.lower() == 'external' or val.lower() == 'internal':
             self._visainstrument.write('source:roscillator:source '+str(val))
         else:
@@ -664,8 +664,8 @@ class Tektronix_AFG3252(Instrument):
             state (string) : reference
         '''
         logging.debug(__name__ + ' :  Get the reference')
-        
-        if self._visainstrument.ask('source:roscillator:source?') == 'EXT':
+
+        if self._visainstrument.query('source:roscillator:source?') == 'EXT':
             return 'External'
         else:
             return 'Internal'
@@ -693,46 +693,45 @@ class Tektronix_AFG3252(Instrument):
             None
         '''
         logging.debug(__name__ + ' : set waveform')
-        
+
 
         #We check if the waveform if no to long
         if len(wave) > self.maxpoint or len(wave) < 2:
-            
+
             logging.debug(__name__ + ' :The waveform is too long or too short (number of points).')
             return 'Errors : The waveform is too long or too short (number of points).'
-        
+
         #We check if the waveform is feasible
         if max(wave) > self.max_amplitude/2 + self.max_offset or min(wave) < - self.max_amplitude/2 - self.max_offset or max(wave) - min(wave) > self.max_amplitude :
-            
+
             logging.debug(__name__ + ' : The waveform is out of the range.')
             return 'Errors : The waveform is out of the range.'
-        
-        
+
+
         #We calculate the amplitude and the offset of the tektro
         amplitude = max(wave) - min(wave)
         offset = (max(wave) + min(wave)) / 2
-        
+
         #We tune these values
         self.set_amplitude_ch1( amplitude )
         self.set_offset_ch1( offset )
-        
+
         #We transform all points of the waveforme which are in V in bytes
         wave_bytes = ''
         for i in wave:
-            
+
             #First we tranform V into bins
             j = int( ( (i + abs(min(wave)) ) * ( 2**14 - 1 ))/amplitude )
-            
+
             wave_bytes = wave_bytes + struct.pack('>H', j)
-        
+
         #We research the beginning of the message for the tektro
         number_bytes = int(len(wave))*2
         number_digits = len(str(number_bytes))
 
         #We create the final message for the device
         mes = 'trace ememory,#' + str(number_digits) + str(number_bytes) + wave_bytes
-        
+
         #we prepare the device to be configured
         self.set_arbitrary_waveform_memory_ch1()
         self._visainstrument.write(mes)
-

@@ -64,19 +64,21 @@ class Keithley_2400(Instrument):
         # Initialize wrapper functions
         logging.info('Initializing instrument Keithley_2400')
         Instrument.__init__(self, name, tags=['physical'])
+        rm = visa.ResourceManager
 
         # Add some global constants
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        self._visainstrument.term_chars = '\n'
-        
+        self._visainstrument.write_termination = '\n'
+        self._visainstrument.read_termination = '\n'
+
         self.add_parameter('current',flags=Instrument.FLAG_GETSET, units='A', type=types.FloatType,maxstep=1e-4, stepdelay= 200)
         self.add_parameter('voltage_complience',flags=Instrument.FLAG_SET, units='V', type=types.FloatType)
         self.add_parameter('current_range',flags=Instrument.FLAG_SET, units='A', type=types.FloatType)
-        
+
         self.add_function('reset')
         self.add_function('set_status')
 #        self.add_function('test_get_current')
@@ -87,7 +89,7 @@ class Keithley_2400(Instrument):
             self.set_defaults()
         except:
             raise SystemExit
-    
+
     def reset(self):
         '''
         Sets the instrument to SA mode with default values
@@ -112,13 +114,13 @@ class Keithley_2400(Instrument):
         self.off()
 #        self.set_current(0)
         self.set_voltage_complience(0.4)
-        
-    ###:SENS:FUNC "RES";:SYST:RSEN ON;:SENS:RES:MODE MAN;\    
+
+    ###:SENS:FUNC "RES";:SYST:RSEN ON;:SENS:RES:MODE MAN;\
     def do_set_current(self,val):
         self._visainstrument.write(':SOUR:CURR '+str(val))
 
     def do_get_current(self):
-        return self._visainstrument.ask(':SOUR:CURR?')
+        return self._visainstrument.query(':SOUR:CURR?')
 #        self.on()
 #        self._visainstrument.write('ARM:SOUR IMM;\
 #                                    :ARM:TIM 0.01;\
@@ -131,7 +133,7 @@ class Keithley_2400(Instrument):
 #        outputString = self._visainstrument.read()
 #        outputList = outputString.split(',')
 #        return float(outputList[1])
-    
+
     def do_set_voltage_complience(self, val):
         self._visainstrument.write(':VOLT:PROT '+str(val))
 
@@ -180,5 +182,3 @@ class Keithley_2400(Instrument):
             None
         '''
         self.set_status('on')
-
-
