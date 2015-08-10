@@ -24,7 +24,7 @@ import numpy
 
 import qt
 
-class HP3245A(Instrument):
+class new_visa_HP3245A(Instrument):
     '''
     This is the driver for the Hewlett Packard 3245A universal source
 
@@ -33,10 +33,11 @@ class HP3245A(Instrument):
     <name> = instruments.create('<name>', 'HP3245A',
         address='<VISA address>',
         reset=<bool>,
-		
+
         change_display=<bool>,
         change_autozero=<bool>)
     '''
+
 
     def __init__(self, name, address, reset=False):
         '''
@@ -52,17 +53,20 @@ class HP3245A(Instrument):
         # Initialize wrapper functions
         logging.info('Initializing instrument HP3245A')
         Instrument.__init__(self, name, tags=['physical'])
+        rm = visa.ResourceManager()
 
         # Add some global constants
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        self._visainstrument.term_chars = '\r\n'
+        self._visainstrument.write_termination = '\r\n'
+        self._visainstrument.read_termination = '\r\n'
+        # self._visainstrument.term_chars = '\r\n'
         #self._visainstrument.term_chars = 'None'
-        
-        
+
+
         self.add_parameter('voltage', flags=Instrument.FLAG_GETSET, units='V', minval=-10, maxval=10, type=types.FloatType, maxstep=100e-3, stepdelay= 200)
         self.add_parameter('current', flags=Instrument.FLAG_GETSET, units='A', minval=-0.1, maxval=0.1, type=types.FloatType, maxstep=1e-3, stepdelay= 200)
         self.add_parameter('resolution', flags=Instrument.FLAG_GETSET, option_list=['low', 'high'], type=types.StringType)
@@ -76,13 +80,13 @@ class HP3245A(Instrument):
         self.add_function('on')
         self.add_function('off')
 
-        
+
         if reset:
-		
+
             self.reset()
-			
+
         self.get_all()
-  
+
 
 ##################################################
 #
@@ -94,20 +98,20 @@ class HP3245A(Instrument):
     def set_defaults(self):
         '''
 			Set the instrument to default values
-			
+
 			Input:
 				None
 			Output:
-				None		
+				None
         '''
-		
+
         self.clear_mem()
         self.set_channel('A')
         self.set_mode('dci')
         self.set_resolution('high')
         self.set_autorange('on')
         self.set_current(0)
-		
+
     def reset(self):
         '''
         Reset the instrument
@@ -132,7 +136,7 @@ class HP3245A(Instrument):
         '''
         logging.info(__name__+ ': Clear the instrument memory')
         self._visainstrument.write('SCRATCH')
-		
+
     def get_all(self):
         '''
         Get all parameters of the instrument
@@ -153,22 +157,22 @@ class HP3245A(Instrument):
             self.get_current()
         else:
             self.get_voltage()
-       
-       
-       
-		
+
+
+
+
     def do_set_mode(self, modeName):
         '''
         Change mode to DCI or DCV and apply 0 Ampere/Volt (or: do nothing if the active channel is in the correct mode)
 
         Input:
-            modeName: string 
+            modeName: string
 
         Output:
             None
         '''
-		
-        oldModeName = (self._visainstrument.ask('APPLY?')).lower()
+
+        oldModeName = (self._visainstrument.query('APPLY?')).lower()
         modeName = modeName.lower()
         if oldModeName != modeName:
             if modeName == 'dci' or modeName == 'dcv':
@@ -177,7 +181,7 @@ class HP3245A(Instrument):
             else:
                 raise ValueError('The input parameter should be "dci" or "dcv"')
 
-				
+
     def do_get_mode(self):
         '''
 		    gets the active mode ('dci' or 'dcv')
@@ -187,9 +191,9 @@ class HP3245A(Instrument):
                 String
         '''
         logging.info(__name__+ ' : get the active mode ("dci" or "dcv")')
-        return (self._visainstrument.ask('APPLY?')).lower()
-        	
-		
+        return self._visainstrument.query('APPLY?').lower()
+
+
     def do_set_channel(self, channelName):
         '''
             sets the active channel (A or B). All subsequent set and get commands are applied to this channel until it is changed again.
@@ -222,13 +226,13 @@ class HP3245A(Instrument):
                 String
         '''
         logging.debug(__name__ + ' : get the active channel')
-        channelInt = int(self._visainstrument.ask('USE?'))
+        channelInt = int(self._visainstrument.query('USE?'))
         if channelInt == 0:
             return 'A'
         elif channelInt == 100:
             return 'B'
 
-        
+
     def do_set_current(self, currentValue):
         '''
             Set the output current of the active channel.
@@ -241,7 +245,7 @@ class HP3245A(Instrument):
         '''
         logging.info(__name__ + ' : set the current to '+str(currentValue))
         self._visainstrument.write('APPLY DCI '+str(currentValue))
-        
+
     def do_get_current(self):
         '''
             Get the output current of the active channel.
@@ -250,10 +254,10 @@ class HP3245A(Instrument):
                 - None
         '''
         logging.debug(__name__ + ' : Get the current')
-        if (self._visainstrument.ask('APPLY? '))!='DCI':
+        if (self._visainstrument.query('APPLY? '))!='DCI':
             raise ValueError('Active channel is not in current mode')
         else:
-            return float(self._visainstrument.ask('OUTPUT? '))
+            return float(self._visainstrument.query('OUTPUT? '))
 
     def do_set_voltage(self, voltageValue):
         '''
@@ -267,7 +271,7 @@ class HP3245A(Instrument):
         '''
         logging.info(__name__ + ' : set the voltage to '+str(voltageValue))
         self._visainstrument.write('APPLY DCV '+str(voltageValue))
-        
+
     def do_get_voltage(self):
         '''
             Get the output voltage of the active channel.
@@ -278,13 +282,13 @@ class HP3245A(Instrument):
             Output:
                 - float
         '''
-        
+
         logging.debug(__name__ + ' : Get the voltage')
-        if (self._visainstrument.ask('APPLY? '))!='DCV':
+        if (self._visainstrument.query('APPLY? '))!='DCV':
             raise ValueError('Active channel is not in voltage mode')
         else:
-            return float(self._visainstrument.ask('OUTPUT? '))
-        
+            return float(self._visainstrument.query('OUTPUT? '))
+
     def do_set_range(self, rangeValue):
         '''
             Set the current/voltage range. The range is selected accordingly out of the following lists:
@@ -313,33 +317,33 @@ class HP3245A(Instrument):
             Output:
                 - None
         '''
-        
+
         logging.info(__name__ + ' : set the range to '+str(rangeValue))
         self._visainstrument.write('RANGE '+str(rangeValue))
-		
+
     def do_get_range(self):
         '''
             Get the range of the device
-			
+
             Input:
                 - None
             Output:
                 - String
         '''
-        
+
         logging.info(__name__ + ' : get the range')
-        return self._visainstrument.ask('RANGE?')
+        return self._visainstrument.query('RANGE?')
 
     def do_set_autorange(self,ARStatus):
         '''
             Enables or disables autorange
-            
+
 			Input:
                 -ARStatus "ON" or "OFF"
             Output:
 				-None
 		'''
-		
+
         if ARStatus.lower()=='on' or ARStatus.lower()=='off':
             logging.info(__name__+ 'set autorange to' +str(ARStatus))
             self._visainstrument.write('arange '+str(ARStatus.upper()))
@@ -349,16 +353,16 @@ class HP3245A(Instrument):
     def do_get_autorange(self):
 		'''
 			Get the status of the autorange functions
-			
+
 			Input:
 				-None
 			Output:
 				-None
 		'''
-		
+
 		logging.info(__name__+ 'get the status of the autorange function')
-		return self._visainstrument.ask('ARANGE?')
-		
+		return self._visainstrument.query('ARANGE?')
+
     def do_set_resolution(self, resolution):
         '''
             Set the resolution to the device.
@@ -369,7 +373,7 @@ class HP3245A(Instrument):
             Output:
                 - None
         '''
-			
+
         if resolution.lower() == 'low' or resolution.lower() == 'high':
             logging.info(__name__ + ' : set the resolution to '+str(resolution))
             self._visainstrument.write('DCRES '+str(resolution.upper()))
@@ -379,16 +383,16 @@ class HP3245A(Instrument):
     def do_get_resolution(self):
         '''
             Get the resolution of the device
-			
+
             Input:
                 - None
             Output:
                 - String
         '''
-        
+
         logging.info(__name__ + ' : get the resolution')
-        return self._visainstrument.ask('DCRES?')
-        
+        return self._visainstrument.query('DCRES?')
+
 # shortcuts
     def off(self):
         '''
@@ -399,14 +403,3 @@ class HP3245A(Instrument):
         '''
         definition to get compatibility with Keithley 2400 driver
         '''
-
-
-
-
-
-
-
-
-
-
-

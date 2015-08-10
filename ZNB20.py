@@ -49,12 +49,12 @@ class ZNB20V2(Instrument):
         logging.debug(__name__ + ' : Initializing instrument')
 
         Instrument.__init__(self, name, tags=['physical'])
-
+        rm = visa.ResourceManager
 
         self._address = address
 
         try:
-            self._visainstrument =visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
         self._visainstrument.term_chars = '\n'
@@ -141,6 +141,7 @@ class ZNB20V2(Instrument):
                            flags       = Instrument.FLAG_GETSET,
                            option_list = ['Auto', 'Alternated', 'Chopped'],
                            type        = types.StringType)
+
 
         self.add_function('get_all')
         self.add_function('reset')
@@ -350,7 +351,6 @@ class ZNB20V2(Instrument):
             raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
 
 
-
     def get_traces(self, traces, data_format = 'db-phase'):
         """
             Return data given by the ZNB in the asked format.
@@ -364,13 +364,13 @@ class ZNB20V2(Instrument):
                                         'real-imag', 'db-phase', 'amp-phase'
                                         The phase is returned in rad.
 
+
             Output:
                 - Following the data_format input it returns the tupples:
                     (a1, a2), (b1, b2), ...
                     where a1, a2 are the db-phase, by default, of the trace1
                     and b1, b2 of thr trace2.
         """
-
 
         # We check if traces is tuple type
         if type(traces) is not tuple :
@@ -411,8 +411,6 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('initiate:cont off')
         self._visainstrument.write('*CLS')
         self._visainstrument.write('INITiate1:IMMediate; *OPC')
-
-
 
 
     def averageclear(self):
@@ -487,6 +485,7 @@ class ZNB20V2(Instrument):
 
 #########################################################
 #
+#
 #                Frequency
 #
 #########################################################
@@ -520,7 +519,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:center?')
+        return self._visainstrument.query('frequency:center?')
 
     def do_set_frequencyspan(self, frequencyspan = 1.):
         '''
@@ -551,7 +550,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:span?')
+        return self._visainstrument.query('frequency:span?')
 
 
     def do_set_startfrequency(self, startfrequency = 1.):
@@ -583,7 +582,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:start?')
+        return self._visainstrument.query('frequency:start?')
 
     def do_set_stopfrequency(self, stopfrequency = 1.):
         '''
@@ -614,7 +613,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:stop?')
+        return self._visainstrument.query('frequency:stop?')
 
     def do_set_cwfrequency(self, cwfrequency = 1.):
         '''
@@ -683,7 +682,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the power of the instrument')
-        return self._visainstrument.ask('source:power?')
+        return self._visainstrument.query('source:power?')
 
 #########################################################
 #
@@ -722,7 +721,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the averages of the instrument')
-        return self._visainstrument.ask('average:count?')
+        return self._visainstrument.query('average:count?')
 
     def do_get_averagestatus(self):
         """
@@ -736,6 +735,7 @@ class ZNB20V2(Instrument):
             status (string) : 'on' or 'off'
         """
         logging.debug(__name__ + ' : get status')
+
         stat = self._visainstrument.ask('average?')
         if stat=='1':
           return 'on'
@@ -801,7 +801,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the BW of the instrument')
-        return self._visainstrument.ask('sens:band?')
+        return self._visainstrument.query('sens:band?')
 
 
 #########################################################
@@ -840,7 +840,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the BW of the instrument')
-        return self._visainstrument.ask('sens:sweep:points?')
+        return self._visainstrument.query('sens:sweep:points?')
 
 #########################################################
 #
@@ -878,7 +878,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the sweeps of the instrument')
-        return self._visainstrument.ask('sens:sweep:count?')
+        return self._visainstrument.query('sens:sweep:count?')
 
 #########################################################
 #
@@ -897,7 +897,7 @@ class ZNB20V2(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('output?')
+        stat = self._visainstrument.query('output?')
 
         if (stat=='1'):
           return 'on'
@@ -923,6 +923,7 @@ class ZNB20V2(Instrument):
         else:
             raise ValueError('set_status(): can only set on or off')
         self._visainstrument.write('output %s' % status)
+
 
 #########################################################
 #

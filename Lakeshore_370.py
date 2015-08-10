@@ -1,6 +1,6 @@
 # Lakeshore 370, Lakeshore 370 temperature controller driver
 # !!!the scrypt is made on a base of Lakeshore 340 driver!!!
-# !!!pay attention while uncommenting the lines!!! 
+# !!!pay attention while uncommenting the lines!!!
 # Yuriy Krupko (2014)
 #
 # This program is free software; you can redistribute it and/or modify
@@ -30,9 +30,10 @@ class Lakeshore_370(Instrument):
 
     def __init__(self, name, address, reset=False):
         Instrument.__init__(self, name)
+        rm = visa.ResourceManager
         self._address = address
-        self._visa = visa.instrument(self._address)
-        self._channels = ('1', '2', '5', '6') 
+        self._visa = rm.open_resource(self._address)
+        self._channels = ('1', '2', '5', '6')
 #        self.add_parameter('identification',
 #           flags=Instrument.FLAG_GET)
         self.add_parameter('temp_ch',
@@ -101,7 +102,7 @@ class Lakeshore_370(Instrument):
             print n
             n=n+1
        # ls.close()
-        #while  self._visa.ask('OPC?')!=1:
+        #while  self._visa.query('OPC?')!=1:
 		#	qt.msleep(10)
         self.get_temp_ch1()
         self.get_temp_ch2()
@@ -109,29 +110,29 @@ class Lakeshore_370(Instrument):
       # self.get_temp_ch6()
 
     def do_get_temp_ch(self, channel):
-        ans = self._visa.ask('RDGK? %s' % channel)
+        ans = self._visa.query('RDGK? %s' % channel)
         return float(ans)
 
 #    def do_get_identification(self):
-#        return self._visa.ask('*IDN?')
-#     
+#        return self._visa.query('*IDN?')
+#
 #    def do_get_sensor(self, channel):
-#        ans = self._visa.ask('SRDG? %s' % channel)
+#        ans = self._visa.query('SRDG? %s' % channel)
 #        return float(ans)
-#        
+#
 #    def do_get_heater_range(self):
-#        ans = self._visa.ask('RANGE?')
+#        ans = self._visa.query('RANGE?')
 #        return ans
-#        
+#
 #    def do_set_heater_range(self, val):
 #        self._visa.write('RANGE %d' % val)
-#        
+#
 #    def do_get_heater_output(self):
-#        ans = self._visa.ask('HTR?')
+#        ans = self._visa.query('HTR?')
 #        return ans
-#        
+#
 #    def do_get_mode(self):
-#        ans = self._visa.ask('MODE?')
+#        ans = self._visa.query('MODE?')
 #        return int(ans)
 
 #    def do_set_mode(self, mode):
@@ -144,19 +145,19 @@ class Lakeshore_370(Instrument):
 #        self.set_mode(2)
 
 #    def do_get_pid(self, channel):
-#        ans = self._visa.ask('PID? %d' % channel)
+#        ans = self._visa.query('PID? %d' % channel)
 #        fields = ans.split(',')
 #        if len(fields) != 3:
 #            return None
 #        fields = [float(f) for f in fields]
 #        return fields
-#        
+#
 #    def do_set_pid(self, val, channel):
 #        pass
-#        
+#
 #    def do_get_setpoint(self, channel):
-#        ans = self._visa.ask('SETP? %s' % channel)
+#        ans = self._visa.query('SETP? %s' % channel)
 #        return float(ans)
-#        
+#
 #    def do_set_setpoint(self, val, channel):
 #        self._visa.write('SETP %s, %f' % (channel, val))
