@@ -42,11 +42,12 @@ class Agilent_E8257D_40GHz(Instrument):
         '''
         logging.info(__name__ + ' : Initializing instrument Agilent_E8257D')
         Instrument.__init__(self, name, tags=['physical'])
+        rm = visa.ResourceManager()
 
         # Add some global constants
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
 
@@ -121,7 +122,7 @@ class Agilent_E8257D_40GHz(Instrument):
             ampl (?) : power in ?
         '''
         logging.debug(__name__ + ' : get power')
-        return float(self._visainstrument.ask('POW:AMPL?'))
+        return float(self._visainstrument.query('POW:AMPL?'))
 
     def do_set_power(self, amp):
         '''
@@ -147,7 +148,7 @@ class Agilent_E8257D_40GHz(Instrument):
             phase (float) : Phase in radians
         '''
         logging.debug(__name__ + ' : get phase')
-        return float(self._visainstrument.ask('PHASE?'))
+        return float(self._visainstrument.query('PHASE?'))
 
     def do_set_phase(self, phase):
         '''
@@ -173,7 +174,7 @@ class Agilent_E8257D_40GHz(Instrument):
             freq (float) : Frequency in Hz
         '''
         logging.debug(__name__ + ' : get frequency')
-        return float(self._visainstrument.ask('FREQ:CW?'))
+        return float(self._visainstrument.query('FREQ:CW?'))
 
     def do_set_frequency(self, freq):
         '''
@@ -202,7 +203,7 @@ class Agilent_E8257D_40GHz(Instrument):
 
         # Output can be '0', '1' or '0\n', '1\n' which are different strings.
         # By using int() we can only get 1 or 0 independently of the OS.
-        stat = int(self._visainstrument.ask('OUTP?'))
+        stat = int(self._visainstrument.query('OUTP?'))
 
         if stat == 1:
           return 'on'
@@ -242,7 +243,7 @@ class Agilent_E8257D_40GHz(Instrument):
         logging.debug(__name__ + ' : get status')
         # Output can be '0', '1' or '0\n', '1\n' which are different strings.
         # By using int() we can only get 1 or 0 independently of the OS.
-        stat = int(self._visainstrument.ask(':pulm:stat?'))
+        stat = int(self._visainstrument.query(':pulm:stat?'))
 
         if stat == 1:
           return 'on'
@@ -280,7 +281,7 @@ class Agilent_E8257D_40GHz(Instrument):
             type (string) :'square', 'frun', 'trigered', 'doublet', 'gated'
         '''
         logging.debug(__name__ + ' : get pulse type')
-        stat = self._visainstrument.ask(':pulm:source:internal?')
+        stat = self._visainstrument.query(':pulm:source:internal?')
 
         return stat
 
@@ -316,7 +317,7 @@ class Agilent_E8257D_40GHz(Instrument):
             period (float) : repetition period in second
         '''
         logging.debug(__name__ + ' : get pulse period')
-        stat = self._visainstrument.ask(':pulm:internal:period?')
+        stat = self._visainstrument.query(':pulm:internal:period?')
 
         return stat
 
@@ -344,7 +345,7 @@ class Agilent_E8257D_40GHz(Instrument):
             width (float) : width in second
         '''
         logging.debug(__name__ + ' : get pulse width')
-        stat = self._visainstrument.ask(':pulm:internal:pwidth?')
+        stat = self._visainstrument.query(':pulm:internal:pwidth?')
 
         return stat
 
@@ -425,7 +426,7 @@ class Agilent_E8257D_40GHz(Instrument):
         logging.debug(__name__ + ' : get frequency sweep mode status')
         # Output can be '0', '1' or '0\n', '1\n' which are different strings.
         # By using int() we can only get 1 or 0 independently of the OS.
-        stat = self._visainstrument.ask('SWE:RUNN?')
+        stat = self._visainstrument.query('SWE:RUNN?')
 
         if stat == 1:
           return 'on'
