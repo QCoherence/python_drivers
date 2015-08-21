@@ -24,13 +24,13 @@ class iMACRT(Instrument):
         Instrument.__init__(self, name, tags=['physical','Temperature'])
 
         self._numcards = int(numcards)
-        
+
         self._localhost = ''
         self._localport = 12000 # messages are received by client at this port
 
         self._host = host
         self._remoteport = self._localport+int(self._host.split('.')[-1]) # messages are send by client to this port
-        
+
         if ch_names:
             if type(ch_names)==types.StringType:
                 self._names_len = 1
@@ -40,12 +40,12 @@ class iMACRT(Instrument):
             self._names=ch_names
         else:
             self._names=('','','')
- 
+
         self.add_function('get_all')
 
         self.add_parameter('IP_address',type=types.StringType, flags=Instrument.FLAG_GET)
         self.add_parameter('Head_Name',type=types.StringType, flags=Instrument.FLAG_GET)
-        
+
         self.get_IP_address()
         self._type=self.get_Head_Name()[:3]
         if self._type == 'MMR':
@@ -56,13 +56,13 @@ class iMACRT(Instrument):
                 channel_prefix='ch%d_',
     #            format='%.3f',
                 units='K'
-                )       
+                )
             self.add_parameter('Name',
                 type=types.StringType,
                 flags=Instrument.FLAG_GETSET,
                 channels=(1, self._numcards),
                 channel_prefix='ch%d_',
-                )       
+                )
             self.add_parameter('Resistance',
                 type=types.FloatType,
                 flags=Instrument.FLAG_GET,
@@ -136,17 +136,17 @@ class iMACRT(Instrument):
                 channels=(1, self._numcards),
                 channel_prefix='ch%d_'
                 )
-            
+
             self._param_dict = {'ON':1,'setpoint':2,'P':4,'I':5,'D':6,'Pmax':7,'R':8,'name':11,'ch':12}
             self._param_period = 12
-            
+
         elif self._type == 'iMA':
             print 'this iMACRT unit is disconnected'
             return
         else:
             print 'unknown device'
             return
-            
+
         self.get_all()
         self._interrogation = False
 
@@ -169,13 +169,13 @@ class iMACRT(Instrument):
                 sleep(0.001)
                 self.get(param)
         self._interrogation = False
-    
+
     def interrogate(self, ch, param):
         if param not in self._param_dict:
             return
         message = self._type + '3GET %d' % (self._param_period*(ch-1)+self._param_dict[param])
         return self._send(message, recv=True)
-    
+
     def submit(self, ch, param, val):
         if param not in self._param_dict:
             return
@@ -185,16 +185,16 @@ class iMACRT(Instrument):
     def _send(self, message, recv=False,verbose=False):
         sout = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sout.connect((self._host, self._remoteport))
-        
+
         if verbose:
             print 'sending: %s' % message
         sout.sendall(message)
         sout.close()
-    
+
         if recv:
             sin = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sin.bind((self._localhost, self._localport))
-            sin.settimeout(1)
+            sin.settimeout(1) # may have to change 1 into 1000
 
             try:
                 reply = sin.recvfrom(548)
@@ -211,7 +211,7 @@ class iMACRT(Instrument):
 ###
     def do_get_IP_address(self):
         return self._host
-    
+
     def do_get_Head_Name(self):
         return self._send('*IDN',recv=True)
 
@@ -221,8 +221,8 @@ class iMACRT(Instrument):
             self._interrogation = True
             self.get('ch%d_Resistance'%(channel))
             self._interrogation = False
-        return float(self.interrogate(channel,'T')) 
-    
+        return float(self.interrogate(channel,'T'))
+
     def do_get_Resistance(self, channel):
         if not self._interrogation:
             self._interrogation = True
@@ -232,21 +232,21 @@ class iMACRT(Instrument):
 
     def do_get_Name(self, channel):
         return self._names[channel-1]
-    
+
     def do_set_Name(self,  value, channel):
         self._names[channel-1] = value
-    
+
 #Parameters for MGC
     def do_get_on(self, channel):
         return int(float(self.interrogate(channel,'ON')))
     def do_get_setpoint(self, channel):
-        return float(self.interrogate(channel,'setpoint')) 
+        return float(self.interrogate(channel,'setpoint'))
     def do_get_P(self, channel):
-        return float(self.interrogate(channel,'P')) 
+        return float(self.interrogate(channel,'P'))
     def do_get_I(self, channel):
-        return float(self.interrogate(channel,'I')) 
+        return float(self.interrogate(channel,'I'))
     def do_get_D(self, channel):
-        return float(self.interrogate(channel,'D')) 
+        return float(self.interrogate(channel,'D'))
     def do_get_max_power(self, channel):
         return float(self.interrogate(channel,'Pmax'))
     def do_get_Resistance(self, channel):
@@ -273,4 +273,3 @@ class iMACRT(Instrument):
         self.submit(channel,'name','"'+val[:13]+'"')
     def do_set_mmr3_Channel(self,val,channel):
         self.submit(channel,'ch',val-1)
-
