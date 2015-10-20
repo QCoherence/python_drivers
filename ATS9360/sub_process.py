@@ -206,7 +206,8 @@ def data_acquisition(board, queue_data, parameters, buffers):
 
     start = time.clock() # Keep track of when acquisition started
     board.startCapture() # Start the acquisition
-    print("Capturing %d buffers. Press any key to abort" % buffersPerAcquisition)
+
+    message = 'Capturing %d buffers\n' % buffersPerAcquisition
     buffersCompleted = 0
     bytesTransferred = 0
 
@@ -229,7 +230,7 @@ def data_acquisition(board, queue_data, parameters, buffers):
 
     # Compute the total transfer time, and display performance information.
     transferTime_sec = time.clock() - start
-    print("Capture completed in %f sec" % transferTime_sec)
+    message += 'Capture completed in %f sec\n' % transferTime_sec
     buffersPerSec      = 0
     bytesPerSec        = 0
     recordsPerSec      = 0
@@ -240,11 +241,12 @@ def data_acquisition(board, queue_data, parameters, buffers):
         recordsPerSec = recordsPerBuffer * buffersCompleted / transferTime_sec
         samplePerSec  = samplesTransferred / transferTime_sec
 
-    print("Captured %d buffers (%f buffers per sec)" % (buffersCompleted, buffersPerSec))
-    print("Captured %d records (%f records per sec)" % (recordsPerBuffer * buffersCompleted, recordsPerSec))
-    print("Transferred %d bytes (%f Gbytes per sec)" % (bytesTransferred, bytesPerSec/1024**3.))
-    print("Transferred %d samples (%f GS per sec)" % (samplesTransferred, samplePerSec/1e9))
+    message += 'Captured %d buffers (%f buffers per sec)\n' % (buffersCompleted, buffersPerSec)
+    message += 'Captured %d records (%f records per sec)\n' % (recordsPerBuffer * buffersCompleted, recordsPerSec)
+    message += 'Transferred %d bytes (%f Gbytes per sec)\n' % (bytesTransferred, bytesPerSec/1024**3.)
+    message += 'Transferred %d samples (%f GS per sec)\n' % (samplesTransferred, samplePerSec/1e9)
 
+    parameters['message'] = message
 
 def get_data(queue_data, parameters):
 

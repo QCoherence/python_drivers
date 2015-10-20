@@ -21,9 +21,16 @@ import visa
 import time
 import multiprocessing as mp
 from ATS9360 import atsapi as ats
-from ATS9360 import sub_process_2 as sub_process
+from ATS9360 import sub_process
 from ATS9360 import data_treatment
 import numpy as np
+import ctypes
+from ATS9360.plot import AtsPlot
+from ATS9360.plot2 import plot_test
+
+
+from pyqtgraph.Qt import QtGui, QtCore
+import pyqtgraph as pg
 
 class ATS9360_NPT(Instrument):
 
@@ -166,9 +173,7 @@ class ATS9360_NPT(Instrument):
         self.acquisition_time        = self.acquired_samples/1.8 # In ns, float
         self.records_per_buffer      = 20 # Must be integer
         self.nb_buffer_allocated     = 40 # Must be integer
-        self.nb_buffer_allocated     = 10 # Must be integer
-        self.buffers_per_acquisition = 1000 # Must be integer
-        self.buffers_per_acquisition = 10 # Must be integer
+        self.buffers_per_acquisition = 200 # Must be integer
 
         # Attributes of data
         self.data_cha = None
@@ -205,14 +210,13 @@ class ATS9360_NPT(Instrument):
 
 
 
-
-#########################################################################
-#
-#
-#                           Methods about the parameters of the board
-#
-#
-#########################################################################
+    #########################################################################
+    #
+    #
+    #                           Methods about the parameters of the board
+    #
+    #
+    #########################################################################
 
 
 
@@ -285,389 +289,91 @@ class ATS9360_NPT(Instrument):
 
 
 
-#########################################################################
-#
-#
-#                           Method to perform asynchroneous measurement
-#
-#
-#########################################################################
+    #########################################################################
+    #
+    #
+    #                           Method to perform asynchroneous measurement
+    #
+    #
+    #########################################################################
 
 
 
-    def measure(self):
+    def measure(self, processor):
 
         # We create the Queue to be able to share data between processes
         # Will contain measured data
         queue_data = mp.Queue()
-        # manager    = mp.Manager()
 
-        # treat_data = mp.RawArray('d', [0]*self.acquired_samples)
-        # finish     = manager.list()
+        # We create variables to handle data treatment
+        queue_treatment = mp.Queue()
+        manager         = mp.Manager()
+        finish          = manager.list([False]*self.nb_process_data_treatment)
 
-        # for i in range(self.nb_process_data_treatment):
-        #     finish.append(False)
+
+        queue_plot = mp.Queue()
 
         # We get the manager containing all experiment parameters
         parameters = self._get_parameters()
 
+        processor.initialization()
+
+        start_data_treatment = time.clock()
+        # We create and launch data treatment processes
+        for index_processus in range(self.nb_process_data_treatment):
+            worker = mp.Process(target = processor.process,
+                                args   = (queue_data,
+                                          queue_plot,
+                                          queue_treatment,
+                                          parameters,
+                                          finish,
+                                          index_processus))
+            worker.start()
 
         # We create the Process
         # At this point the process is not start
+        worker_plot = mp.Process(target = plot_test,
+                                         args   = (queue_plot,
+                                                   finish,
+                                                   parameters))
+        worker_plot.start()
+        # We create the Process
+        # At this point the process is not start
         worker_acquire_data = mp.Process(target = sub_process.get_data,
-                                      args   = (queue_data,
-                                                parameters))
+                                         args   = (queue_data,
+                                                   parameters))
 
         # At this point the process is started
         # Consequently, the measurement is launched.
         worker_acquire_data.start()
 
-        # for i in range(self.nb_process_data_treatment):
-        #     worker = mp.Process(target = data_treatment.hum,
-        #                                      args   = (queue_data,
-        #                                                treat_data,
-        #                                                parameters,
-        #                                                finish,
-        #                                                i))
-        #     worker.start()
-
-
-
-
 
         # While data_treatment is True, we are treating data
         # Surely, the data acquisition will finish before the data treatment
         # but the worker will be stopped only when the data treatment will be
         # finished.
-        # while not all(finish):
-        #
-        #     pass
-        #
-        # return np.frombuffer(treat_data), queue_data.get()
+        while not all(finish):
 
+            pass
 
-        # While data_treatment is True, we are treating data
-        # Surely, the data acquisition will finish before the data treatment
-        # but the worker will be stopped only when the data treatment will be
-        # finished.
-        data_treatment = True
-        counter = 0.
-        while data_treatment:
 
-            # We get data
-            data = queue_data.get()
+        print parameters['message']
+        elasped_time = time.clock() - start_data_treatment
+        print('data treatment done in: %f sec' % elasped_time)
 
-            # We transform data in volt.
-            data_volt                    = self.data_in_volt(data)
+        result = queue_treatment.get()
 
-            # We obtain the current averaging of channel A and B data
-            data_cha, data_chb           = self.data_cha_chb(data_volt)
+        queue_treatment.close()
+        queue_data.close()
+        return result
 
-            # We "save" the total averaging in the data attributes.
-            self.data_cha, self.data_chb = self.data_average_cha_chb(data_cha,
-                                                                     data_chb,
-                                                                     counter)
-
-            counter += 1
-
-            # To finish the loop
-            if counter == self.buffers_per_acquisition:
-                data_treatment = False
-
-        return self.data_cha, self.data_chb, data
-        # return data#[::2][10240]
-
-
-    def measure_2(self):
-
-
-
-        board = ats.Board(systemId = 1, boardId = 1)
-        samplesPerSec = 1800.e6
-        # board.setCaptureClock(ats.INTERNAL_CLOCK,
-        #                       ats.SAMPLE_RATE_1800MSPS,
-        #                       ats.CLOCK_EDGE_RISING,
-        #                       0)
-
-        board.setCaptureClock(ats.EXTERNAL_CLOCK_10MHz_REF,
-                              samplesPerSec,
-                              ats.CLOCK_EDGE_RISING,
-                              1)
-
-        # TODO: Select channel A input parameters as required.
-        board.inputControl(ats.CHANNEL_A,
-                           ats.DC_COUPLING,
-                           ats.INPUT_RANGE_PM_400_MV,
-                           ats.IMPEDANCE_50_OHM)
-
-
-        # TODO: Select channel B input parameters as required.
-        board.inputControl(ats.CHANNEL_B,
-                           ats.DC_COUPLING,
-                           ats.INPUT_RANGE_PM_400_MV,
-                           ats.IMPEDANCE_50_OHM)
-
-        # TODO: Select trigger inputs and levels as required.
-        board.setTriggerOperation(ats.TRIG_ENGINE_OP_J,
-                                  ats.TRIG_ENGINE_J,
-                                  ats.TRIG_EXTERNAL,
-                                  ats.TRIGGER_SLOPE_POSITIVE,
-                                  150,
-                                  ats.TRIG_ENGINE_K,
-                                  ats.TRIG_DISABLE,
-                                  ats.TRIGGER_SLOPE_POSITIVE,
-                                  128)
-
-        # TODO: Select external trigger parameters as required.
-        board.setExternalTrigger(ats.DC_COUPLING,
-                                 ats.ETR_5V)
-                                #  ats.ETR_TTL)
-
-        # TODO: Set trigger delay as required.
-        triggerDelay_sec = 0
-        triggerDelay_samples = int(triggerDelay_sec * samplesPerSec + 0.5)
-        board.setTriggerDelay(triggerDelay_samples)
-
-        # TODO: Set trigger timeout as required.
-        #
-        # NOTE: The board will wait for a for this amount of time for a
-        # trigger event.  If a trigger event does not arrive, then the
-        # board will automatically trigger. Set the trigger timeout value
-        # to 0 to force the board to wait forever for a trigger event.
-        #
-        # IMPORTANT: The trigger timeout value should be set to zero after
-        # appropriate trigger parameters have been determined, otherwise
-        # the board may trigger if the timeout interval expires before a
-        # hardware trigger event arrives.
-        triggerTimeout_sec = 0
-        triggerTimeout_clocks = int(triggerTimeout_sec / 10e-6 + 0.5)
-        board.setTriggerTimeOut(triggerTimeout_clocks)
-
-        # Configure AUX I/O connector as required
-        board.configureAuxIO(ats.AUX_OUT_TRIGGER,
-                             0)
-        # No pre-trigger samples in NPT mode
-        preTriggerSamples = 0
-
-        # TODO: Select the number of sam<ples per record.
-        postTriggerSamples = 10240
-        postTriggerSamples = 128*80
-
-        # TODO: Select the number of records per DMA buffer.
-        recordsPerBuffer = 20
-
-
-
-        # TODO: Select the active channels.
-        channels = ats.CHANNEL_A | ats.CHANNEL_B
-        channelCount = 0
-        for c in ats.channels:
-            channelCount += (c & channels == c)
-
-        # TODO: Should data be saved to file?
-        saveData = False
-        dataFile = None
-        if saveData:
-            dataFile = open(os.path.join(os.path.dirname(__file__), "data.bin"), 'w')
-
-        # Compute the number of bytes per record and per buffer
-        memorySize_samples, bitsPerSample = board.getChannelInfo()
-        # print memorySize_samples.value, bitsPerSample.value
-        bytesPerSample = (bitsPerSample.value + 7) // 8
-        samplesPerRecord = preTriggerSamples + postTriggerSamples
-        bytesPerRecord = bytesPerSample * samplesPerRecord
-        bytesPerBuffer = bytesPerRecord * recordsPerBuffer * channelCount
-
-        # print channelCount
-
-        # TODO: Select number of DMA buffers to allocate
-        bufferCount = 10
-        # TODO: Select the number of buffers per acquisition.
-        # buffersPerAcquisition = bufferCount
-        buffersPerAcquisition = 10
-        # Allocate DMA buffers
-        buffers = []
-        for i in range(bufferCount):
-            buffers.append(ats.DMABuffer(bytesPerSample, bytesPerBuffer))
-
-        # Set the record size
-        board.setRecordSize(preTriggerSamples, postTriggerSamples)
-
-        recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
-
-        # Configure the board to make an NPT AutoDMA acquisition
-        board.beforeAsyncRead(channels,
-                              -preTriggerSamples,
-                              samplesPerRecord,
-                              recordsPerBuffer,
-                              recordsPerAcquisition,
-                              ats.ADMA_EXTERNAL_STARTCAPTURE | ats.ADMA_NPT | ats.ADMA_FIFO_ONLY_STREAMING)
-
-
-
-        # Post DMA buffers to board
-        for buffer in buffers:
-            board.postAsyncBuffer(buffer.addr, buffer.size_bytes)
-
-        start = time.clock() # Keep track of when acquisition started
-        board.startCapture() # Start the acquisition
-        print("Capturing %d buffers. Press any key to abort" % buffersPerAcquisition)
-        buffersCompleted = 0
-        bytesTransferred = 0
-        while buffersCompleted < buffersPerAcquisition:
-        # for buffer in buffers:
-            # Wait for the buffer at the head of the list of available
-            # buffers to be filled by the board.
-            buffer = buffers[buffersCompleted % len(buffers)]
-
-            board.waitAsyncBufferComplete(buffer.addr, timeout_ms=5000)
-            buffersCompleted += 1
-            bytesTransferred += buffer.size_bytes
-
-            # queue_data.put(buffer.buffer)
-
-            # TODO: Process sample data in this buffer. Data is available
-            # as a NumPy array at buffer.buffer
-
-            # NOTE:
-            #
-            # While you are processing this buffer, the board is already
-            # filling the next available buffer(s).
-            #
-            # You MUST finish processing this buffer and post it back to the
-            # board before the board fills all of its available DMA buffers
-            # and on-board memory.
-            #
-            # Samples are arranged in the buffer as follows: S0A, S0B, ..., S1A, S1B, ...
-            # with SXY the sample number X of channel Y.
-            #
-            # A 12-bit sample code is stored in the most significant bits of
-            # in each 16-bit sample value.
-            #
-            # Sample codes are unsigned by default. As a result:
-            # - a sample code of 0x0000 represents a negative full scale input signal.
-            # - a sample code of 0x8000 represents a ~0V signal.
-            # - a sample code of 0xFFFF represents a positive full scale input signal.
-            # Optionaly save data to file
-            if dataFile:
-                buffer.buffer.tofile(dataFile)
-
-            # Update progress bar
-            #waitBar.setProgress(buffersCompleted / buffersPerAcquisition)
-
-            # Add the buffer to the end of the list of available buffers.
-            board.postAsyncBuffer(buffer.addr, buffer.size_bytes)
-        # Compute the total transfer time, and display performance information.
-        transferTime_sec = time.clock() - start
-        print("Capture completed in %f sec" % transferTime_sec)
-        buffersPerSec = 0
-        bytesPerSec = 0
-        recordsPerSec = 0
-        samplesTransferred = samplesPerRecord*recordsPerBuffer*buffersPerAcquisition
-        if transferTime_sec > 0:
-            buffersPerSec = buffersCompleted / transferTime_sec
-            bytesPerSec = bytesTransferred / transferTime_sec
-            recordsPerSec = recordsPerBuffer * buffersCompleted / transferTime_sec
-            samplePerSec  = samplesTransferred / transferTime_sec
-        print("Captured %d buffers (%f buffers per sec)" % (buffersCompleted, buffersPerSec))
-        print("Captured %d records (%f records per sec)" % (recordsPerBuffer * buffersCompleted, recordsPerSec))
-        print("Transferred %d bytes (%f Gbytes per sec)" % (bytesTransferred, bytesPerSec/1024**3.))
-        print("Transferred %d samples (%f GS per sec)" % (samplesTransferred, samplePerSec/1e9))
-
-        # Abort transfer.
-        board.abortAsyncRead()
-        return buffers
-
-
-#########################################################################
-#
-#
-#                           Method to treat data
-#
-#
-#########################################################################
-
-
-    def data_average_cha_chb(self, data_cha, data_chb, current_iteration):
-        """
-            Perform the averaging of acquired data following the number of
-            iteration at which the averaging is done.
-            The return averaging is then always the arithmetic averaging of
-            the measured data.
-
-            current_iteration must start from 0.
-        """
-        # For the first iteration, the averaging is just an addition
-        if current_iteration == 0.:
-            data_cha += data_cha
-            data_chb += data_chb
-        # For all other iterations, we perform the averaging
-        else:
-            data_cha = data_cha*current_iteration/(current_iteration + 1.)\
-                       + data_cha/(current_iteration + 1.)
-            data_chb = data_chb*current_iteration/(current_iteration + 1.)\
-                       + data_chb/(current_iteration + 1.)
-
-        return data_cha, data_chb
-
-
-    def data_cha_chb(self, data_volt):
-        """
-            From the data returned by the board and transormed in data_volt,
-            the method splits data coming from the two channels and make the
-            averaging on one buffer.
-        """
-
-        # We split the two channels
-        data_cha = data_volt[ ::2]
-        data_chb = data_volt[1::2]
-
-        # We reshape them in 2D-array to enhance the averaging
-        data_cha = np.reshape(data_cha, (self.records_per_buffer,
-                                         self.acquired_samples))
-        data_chb = np.reshape(data_chb, (self.records_per_buffer,
-                                         self.acquired_samples))
-
-        # We average along the axis of the repetitions
-        data_cha = np.mean(data_cha, axis = 0)
-        data_chb = np.mean(data_chb, axis = 0)
-
-        return data_cha, data_chb
-
-
-
-    def data_in_volt(self, data):
-        """
-            Get raw data coming from the board and transform them in V.
-        """
-
-        # Parameters of the board (are fixed).
-        bitshift         = 4  # Sould be int
-        bits_per_sample  = 12 # Sould be int
-        inputRange_volts = 400e-3
-
-        # Right-shift 16-bit sample value by 4 to get 12-bit sample code
-        sampleCode = data >> bitshift
-
-        # AlazarTech digitizers are calibrated as follows
-        codeZero  = (1 << (bits_per_sample - 1)) - 0.5
-        codeRange = (1 << (bits_per_sample - 1)) - 0.5
-
-        # Simple proportionality
-        sampleVolts = inputRange_volts*(sampleCode - codeZero) / codeRange
-
-        return sampleVolts
-
-
-
-
-#########################################################################
-#
-#
-#                           Data treatment
-#
-#
-#########################################################################
+    #########################################################################
+    #
+    #
+    #                           Data treatment
+    #
+    #
+    #########################################################################
 
     def do_set_nb_process_data_treatment(self, nb_process_data_treatment):
         '''Set the number of process dedicated to data treatment
@@ -709,13 +415,13 @@ class ATS9360_NPT(Instrument):
 
 
 
-#########################################################################
-#
-#
-#                           Acquisition
-#
-#
-#########################################################################
+    #########################################################################
+    #
+    #
+    #                           Acquisition
+    #
+    #
+    #########################################################################
 
     def do_set_acquisition_time(self, acquisition_time):
         '''Set the acquisition time in [ns]
@@ -882,13 +588,13 @@ class ATS9360_NPT(Instrument):
 
 
 
-#########################################################################
-#
-#
-#                           The trigger
-#
-#
-#########################################################################
+    #########################################################################
+    #
+    #
+    #                           The trigger
+    #
+    #
+    #########################################################################
 
 
     def do_set_trigger_delay(self, trigger_delay):
@@ -1040,13 +746,13 @@ class ATS9360_NPT(Instrument):
 
 
 
-#########################################################################
-#
-#
-#                           The clock
-#
-#
-#########################################################################
+    #########################################################################
+    #
+    #
+    #                           The clock
+    #
+    #
+    #########################################################################
 
 
     def do_set_clock_edge(self, clock_edge):
