@@ -58,7 +58,7 @@ class Tabor_WX1284C(Instrument):
     think about:    clock, waveform length
 
     TODO:
-    complete de driver
+    complete the driver
     write a cleaner version of 'init_channel'
     make the string formatting uniform
     '''
@@ -116,9 +116,9 @@ class Tabor_WX1284C(Instrument):
             channels=(1, 4), channel_prefix='ch%d_',
             minval=0.05, maxval=2, units='Volts')
 
-        self.add_parameter('all_amp', type=types.FloatType,
-            flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET,
-            minval=0.05, maxval=2, units='Volts')
+        # self.add_parameter('all_amp', type=types.FloatType,
+        #     flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET,
+        #     minval=0.05, maxval=2, units='Volts')
 
 
         self.add_parameter('offset', type=types.FloatType,
@@ -126,9 +126,9 @@ class Tabor_WX1284C(Instrument):
             channels=(1, 4), channel_prefix='ch%d_',
             minval=-1, maxval=1, units='Volts')
 
-        self.add_parameter('all_offset', type=types.FloatType,
-            flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET,
-            minval=-1, maxval=1, units='Volts')
+        # self.add_parameter('all_offset', type=types.FloatType,
+        #     flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET,
+        #     minval=-1, maxval=1, units='Volts')
 
         self.add_parameter('trigger_level', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
@@ -144,27 +144,18 @@ class Tabor_WX1284C(Instrument):
         # self.add_parameter('numpoints', type=types.IntType,
             # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             # minval=192, maxval=16e9, units='Int')
-        # self.add_parameter('amplitude', type=types.FloatType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4), minval=0, maxval=2, units='Volts')
-        # self.add_parameter('offset', type=types.FloatType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4), minval=-2, maxval=2, units='Volts')
-        # self.add_parameter('marker1_low', type=types.FloatType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4), minval=-2, maxval=2, units='Volts')
-        # self.add_parameter('marker1_high', type=types.FloatType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4), minval=-2, maxval=2, units='Volts')
-        # self.add_parameter('marker2_low', type=types.FloatType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4), minval=-2, maxval=2, units='Volts')
-        # self.add_parameter('marker2_high', type=types.FloatType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4), minval=-2, maxval=2, units='Volts')
-        # self.add_parameter('status', type=types.StringType,
-            # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
-            # channels=(1, 4))
+
+
+
+        self.add_parameter('marker_high_1_2', type=types.FloatType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1, 2), channel_prefix='m%d_',
+            minval=0.5, maxval=1.2, units='Volts')
+
+        self.add_parameter('marker_high_3_4', type=types.FloatType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1, 2), channel_prefix='m%d_',
+            minval=0.5, maxval=1.2, units='Volts')
 
         # Add functions
         self.add_function('clean_visa_open')
@@ -172,7 +163,8 @@ class Tabor_WX1284C(Instrument):
         self.add_function('clear_err')
         self.add_function('init_channel')
         self.add_function('get_all')
-
+        self.add_function('set_all_amp')
+        self.add_function('set_all_offset')
         #opening the visa session
         self.clean_visa_open()
 
@@ -182,7 +174,7 @@ class Tabor_WX1284C(Instrument):
         else:
             self.get_all()
 
-    #Functions
+    # Functions ###############################################################
     def clean_visa_open(self):
         '''
         Opens a visa session with the proper parameters
@@ -268,6 +260,8 @@ class Tabor_WX1284C(Instrument):
         for i in Mark_num:
             self.get('m%d_marker_status_1_2' % i)
             self.get('m%d_marker_status_3_4' % i)
+            self.get('m%d_marker_high_1_2' % i)
+            self.get('m%d_marker_high_3_4' % i)
 
     def clear_err(self):
         '''
@@ -294,13 +288,50 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( '{} : Initializing channel {0:d}'.format(__name__,channel))
         # Select channel
-        toto._visainstrument.write(":INST:SEL {0:d}".format(channel))
+        self.channel_select(channel)
+        # toto._visainstrument.write(":INST:SEL {0:d}".format(channel))
+        
         # Set it to 'User-Mode'
         toto._visainstrument.write(":FUNC:MODE USER")
         # Set markers-type to 'user-defined' (external)
         toto._visainstrument.write(":SOUR:MARK:SOUR USER")
 
-    #Parameters
+    def set_all_amp(self, amp):
+        '''
+        Sets the amplitude of all 4 channels at the same time.
+        Input:
+            amp (float): amplitude of the channel in [V]
+        Output:
+            None
+        '''
+        logging.info( __name__+ ': Setting the amplitude of the 4 channels to %s.' %(amp) )
+
+        self._visainstrument.write('OUTP:COUP:ALL DC')
+
+        self._visainstrument.write('VOLT:ALL %s'% amp)
+        if self._visainstrument.query('VOLT ?') != amp:
+            logging.info('The amplitude wasn\'t set properly')
+            raise ValueError('The amplitude wasn\'t set properly')
+
+    def set_all_offset(self, offset):
+        '''
+        Sets the offset of all 4 channels at the same time.
+        Input:
+            offset (float): offset in [V]
+        Output:
+            None
+        '''
+        logging.info( __name__+ ': Setting the offset of the 4 channels to %s.' %(offset) )
+
+        # self._visainstrument.write('OUTP:COUP:ALL DC')
+
+        self._visainstrument.write('VOLT:OFFS:ALL %s'% offset)
+        if self._visainstrument.query('VOLT:OFFS ?') != offset:
+            logging.info('The offset wasn\'t set properly')
+            raise ValueError('The offset wasn\'t set properly')
+
+
+    #Parameters ###############################################################
     def do_get_func_mode(self):
         '''
         Gets the function mode of the instrument
@@ -397,14 +428,7 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Getting the output state of channel %s' % channel)
 
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to get_output'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to get_output. Valid values are 1,2,3,4.'.format(channel))
-
+        self.channel_select(channel)
         return self._visainstrument.query('OUTP?')
 
     def do_set_output(self, state='ON', channel=1):
@@ -421,14 +445,7 @@ class Tabor_WX1284C(Instrument):
 
         logging.info( __name__+' : Setting the output state of channel %s to %s'%( channel, state))
 
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to set_output'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to set_output. Valid values are 1,2,3,4.'.format(channel))
-
+        self.channel_select(channel)
         if state in ('ON','OFF'):
             self._visainstrument.write('OUTP{}'.format(state))
             if self._visainstrument.query('OUTP?') != state:
@@ -450,14 +467,7 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Getting the coupling of channel %s' % channel)
 
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to get_output'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to get_output. Valid values are 1,2,3,4.'.format(channel))
-
+        self.channel_select(channel)
         return self._visainstrument.query('OUTP:COUP ?')
 
     def do_set_coupling(self, coupling='DC', channel=1):
@@ -474,14 +484,7 @@ class Tabor_WX1284C(Instrument):
         '''
 
         logging.info( __name__+' : Setting the coupling of channel %s to %s'%( channel, coupling))
-
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to set_coupling'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to set_coupling. Valid values are 1,2,3,4.'.format(channel))
+        self.channel_select(channel)
 
         if coupling in ('DC','HV'):
             self._visainstrument.write('OUTP:COUP %s'% coupling)
@@ -624,123 +627,52 @@ class Tabor_WX1284C(Instrument):
             raise ValueError('The invalid value %s was sent to set_clock_freq. Valid values are from 10 to 1250 MHz with 8-digits precision.' % freq)
 
 
-# # added by remy:
-# pb with  set_all_output: "error" message (even if it seems to be working): "the instrument does not support getting all output"
-    # def do_set_all_output(self, state):
-    #     '''
-    #     Sets the state of all 4 channels to ON or OFF
-    #
-    #     Input:
-    #         state (string): 'ON' or 'OFF'
-    #
-    #     Output:
-    #         None
-    #     '''
-    #
-    #     logging.info( __name__+' : Setting the output state of all 4 channels to %s'%(state) )
-    #
-    #     if state in ('ON','OFF'):
-    #         self._visainstrument.write('OUTP:ALL{}'.format(state))
-
-    #         if self._visainstrument.query('OUTP:STAT?') != state:
-    #             logging.info('ON/OFF wasn\'t set properly')
-    #     else:
-    #         logging.info('The invalid state {} was sent to set_output'.format(state))
-    #         raise ValueError('The invalid state {} was sent to set_output. Valid values are \'ON\' or \'OFF\'.'.format(state))
-    #
-
-    def do_set_all_amp(self, amp):
-        '''
-        Sets the amplitude of all 4 channels at the same time.
-        Input:
-            amp (float): amplitude of the channel in [V]
-        Output:
-            None
-        '''
-        logging.info( __name__+ ': Setting the amplitude of the 4 channels to %s.' %(amp) )
-
-        self._visainstrument.write('OUTP:COUP:ALL DC')
-
-        self._visainstrument.write('VOLT:ALL %s'% amp)
-        if self._visainstrument.query('VOLT ?') != amp:
-            logging.info('The amplitude wasn\'t set properly')
-            raise ValueError('The amplitude wasn\'t set properly')
-
-    def do_set_all_offset(self, offset):
-        '''
-        Sets the offset of all 4 channels at the same time.
-        Input:
-            offset (float): offset in [V]
-        Output:
-            None
-        '''
-        logging.info( __name__+ ': Setting the offset of the 4 channels to %s.' %(offset) )
-
-        # self._visainstrument.write('OUTP:COUP:ALL DC')
-
-        self._visainstrument.write('VOLT:OFFS:ALL %s'% offset)
-        if self._visainstrument.query('VOLT:OFFS ?') != offset:
-            logging.info('The offset wasn\'t set properly')
-            raise ValueError('The offset wasn\'t set properly')
-
     def do_set_amplitude(self, amp, channel=1):
         '''
         Sets the amplitude of the channel.
         Input:
             amp (float): amplitude of the channel in [V]
-            channel (int): Channel ID (1, 2, 3 or 4) or 0 if you want to set the amplitude of all 4 channels
         Output:
             None
         '''
         logging.info( __name__+ ': Setting the amplitude of the channel %s to %s.' %( channel, amp))
 
-        # if channel == 0:
-        #     self._visainstrument.write('VOLT:AMPL:ALL %s'% amp)
-        #     if self._visainstrument.query('VOLT:AMPL:ALL ?') != amp:
-        #         logging.info('The amplitude wasn\'t set properly')
-        #         raise ValueError('The amplitude wasn\'t set properly')
-        # for now: it seems that asking for All amplitude gives an error likely linked to the timeout...
 
-        # we may want to have the possibility to set or get the amplitude of the fours channels at the same time.
-        # We may have a problem if there is a difference between self._visainstrument.query('VOLT:AMPL ?')
-        # and self._visainstrument.query('VOLT:AMPL:ALL ?')
+        # if channel in Channels:
+        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
+        #     if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
+        #         logging.info('Instrument did not select the channel correctly')
+        self.channel_select(channel)
+        self._visainstrument.write('VOLT:AMPL %s'% amp)
+        if self._visainstrument.query('VOLT:AMPL ?') != amp:
+            logging.info('The amplitude wasn\'t set properly')
 
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-            self._visainstrument.write('VOLT:AMPL %s'% amp)
-            if self._visainstrument.query('VOLT:AMPL ?') != amp:
-                logging.info('The amplitude wasn\'t set properly')
-
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to set_amplitude'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to set_amplitude. Valid values are 1,2,3,4.'.format(channel))
+        # else:
+        #     logging.info('The invalid Channel ID {0:d} was sent to set_amplitude'.format(channel))
+        #     raise ValueError('The invalid Channel ID {0:d} was sent to set_amplitude. Valid values are 1,2,3,4.'.format(channel))
 
     def do_get_amplitude(self, channel=1):
         '''
         Gets the amplitude of a channel.
         Input:
-            channel (int): Channel ID (1, 2, 3 or 4) or 0 if you want to get the amplitude of all 4 channels
+        #    channel (int): Channel ID (1, 2, 3 or 4) or 0 if you want to get the amplitude of all 4 channels
         Output:
             amplitude (float): amplitude of the channel in [V]
         '''
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
-        # if channel == 0:
-        #     return self._visainstrument.query('VOLT:AMPL:ALL ?')
-        # timeout pb... same as above...
 
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
+        # if channel in Channels:
+        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
+            # if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
+                # logging.info('Instrument did not select the channel correctly')
 
-            return self._visainstrument.query('VOLT:AMPL ?')
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to get_amplitude'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to get_amplitude. Valid values are 1,2,3,4.'.format(channel))
-            return self._visainstrument.query('VOLT:AMPL ?')
+        self.channel_select(channel)
+        return self._visainstrument.query('VOLT:AMPL ?')
+        # else:
+        #     logging.info('The invalid Channel ID {0:d} was sent to get_amplitude'.format(channel))
+        #     raise ValueError('The invalid Channel ID {0:d} was sent to get_amplitude. Valid values are 1,2,3,4.'.format(channel))
+        #     return self._visainstrument.query('VOLT:AMPL ?')
 
     def do_set_offset(self, offset, channel=1):
         '''
@@ -762,15 +694,16 @@ class Tabor_WX1284C(Instrument):
         # We may have a problem if there is a difference between self._visainstrument.query('VOLT:OFFS ?')
         # and self._visainstrument.query('VOLT:OFFS:ALL ?')
 
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-            self._visainstrument.write('VOLT:OFFS %s'% offset)
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to set_offset'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to set_offset. Valid values are 1,2,3,4.'.format(channel))
-            self._visainstrument.write('VOLT:OFFS %s'% offset)
+        # if channel in Channels:
+        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
+        #     if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
+        #         logging.info('Instrument did not select the channel correctly')
+        self.channel_select(channel)
+        self._visainstrument.write('VOLT:OFFS %s'% offset)
+        # else:
+        #     logging.info('The invalid Channel ID {0:d} was sent to set_offset'.format(channel))
+        #     raise ValueError('The invalid Channel ID {0:d} was sent to set_offset. Valid values are 1,2,3,4.'.format(channel))
+        #     self._visainstrument.write('VOLT:OFFS %s'% offset)
 
         if self._visainstrument.query('VOLT:OFFS ?') != offset:
             logging.info('The offset wasn\'t set properly')
@@ -785,16 +718,16 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
-        #  if channel == 0:
-        #      return self._visainstrument.query('VOLT:OFFS:ALL ?')
-        if channel in Channels:
-            self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                logging.info('Instrument did not select the channel correctly')
-            return self._visainstrument.query('VOLT:OFFS ?')
-        else:
-            logging.info('The invalid Channel ID {0:d} was sent to get_offset'.format(channel))
-            raise ValueError('The invalid Channel ID {0:d} was sent to get_offset. Valid values are 1,2,3,4.'.format(channel))
+
+        # if channel in Channels:
+        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
+        #     if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
+        #         logging.info('Instrument did not select the channel correctly')
+        self.channel_select(channel)
+        return self._visainstrument.query('VOLT:OFFS ?')
+        # else:
+        #     logging.info('The invalid Channel ID {0:d} was sent to get_offset'.format(channel))
+        #     raise ValueError('The invalid Channel ID {0:d} was sent to get_offset. Valid values are 1,2,3,4.'.format(channel))
 
     def do_set_trigger_level(self, trig_val):
         '''
@@ -834,19 +767,15 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Getting the marker status of the marker %s of the channel 1 or 2.' % (channel))
 
         if self._visainstrument.query('INST:SEL?') not in (1, 2):
-            self._visainstrument.write('INST:SEL {0:d}'.format(1) )
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(1):
-                logging.info('Default channel 1   was not selected')
-                raise ValueError('Default channel 1  was not selected.')
+            self.channel_select(1)
 
         if channel in Mark_num:
             self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
-
             if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number for the marker number. Valid values are 1,2.')
+            logging.info('Wrong number of the channel for this marker. Valid values are 1,2.')
 
 
         return self._visainstrument.query('MARK:STAT ?')
@@ -866,19 +795,14 @@ class Tabor_WX1284C(Instrument):
         #     logging.info('Channel 1 or 2  was not selected before hand')
         #     raise ValueError('Channel 1 or 2  was not selected before hand.')
         if self._visainstrument.query('INST:SEL?') not in (1,2):
-            self._visainstrument.write('INST:SEL {0:d}'.format(1))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(1):
-                logging.info('Default channel 1   was not selected ')
-                raise ValueError('Default channel 1  was not selected.')
-
+            self.channel_select(1)
         if channel in Mark_num:
             self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
-
             if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number for the marker number. Valid values are 1,2.')
+            logging.info('Wrong number of the channel for this marker. Valid values are 1,2.')
 
         self._visainstrument.write('MARK:STAT %s' % status)
         if self._visainstrument.query('MARK:STAT ?') != status:
@@ -897,11 +821,7 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Getting the marker status of the marker %s of the channel 3 and 4.' % (channel))
 
         if self._visainstrument.query('INST:SEL?') not in (3, 4):
-            self._visainstrument.write('INST:SEL {0:d}'.format(3) )
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(3):
-                logging.info('Default channel 3 was not selected')
-                raise ValueError('Default channel 3  was not selected.')
-
+            self.channel_select(3)
         if channel in Mark_num:
             self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
 
@@ -909,7 +829,7 @@ class Tabor_WX1284C(Instrument):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number for the marker number. Valid values are 1,2.')
+            logging.info('Wrong number of the channel for this marker. Valid values are 3, 4.')
 
 
         return self._visainstrument.query('MARK:STAT ?')
@@ -927,11 +847,33 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Setting the marker status of the marker %s of the channel 3 and 4 to the status %s.' % (channel, status))
 
         if self._visainstrument.query('INST:SEL?') not in (3, 4):
-            self._visainstrument.write('INST:SEL {0:d}'.format(3))
-            if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(3):
-                logging.info('Default channel 3 was not selected ')
-                raise ValueError('Default channel 3  was not selected.')
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for this marker. Valid values are 3, 4.')
 
+        self._visainstrument.write('MARK:STAT %s' %status )
+        if self._visainstrument.query('MARK:STAT ?') != status:
+            logging.info('The instrument didn\'t set properly the status %s' % status)
+            raise ValueError('The instrument  didn\'t set properly the status %s by set_marker_status' % status)
+
+    def do_get_marker_high_1_2(self, channel=1):
+        '''
+        Gets the status of the marker number "channel" of the channel 1 or 2.
+        Input:
+            channel (int): number of the marker. Valid values are 1, 2
+        Output:
+            high_level (float): high level of the marker output in volt.
+        '''
+
+        logging.info( __name__+ ': Getting the marker high level of the marker %s of the channel 1 or 2.' % (channel))
+
+        if self._visainstrument.query('INST:SEL?') not in (1, 2):
+            self.channel_select(1)
         if channel in Mark_num:
             self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
 
@@ -939,9 +881,103 @@ class Tabor_WX1284C(Instrument):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number for the marker number. Valid values are 1,2.')
+            logging.info('Wrong number of the channel for the marker. Valid values are 1,2.')
 
-        self._visainstrument.write('MARK:STAT %s' %status )
-        if self._visainstrument.query('MARK:STAT ?') != status:
-            logging.info('The instrument didn\'t set properly the status %s' % status)
-            raise ValueError('The instrument  didn\'t set properly the status %s by set_marker_status' % status)
+
+        return self._visainstrument.query('MARK:VOLT:HIGH?')
+
+    def do_set_marker_high_1_2(self, high_level, channel=1):
+        '''
+
+        Input:
+            channel (int): number of the marker. Valid values are 1, 2.
+            high_level (float): high level of the marker output in volt. Valid values are between 0.5 and 1.2.
+        Output:
+            None
+        '''
+
+        logging.info( __name__+ ': Setting the marker high level of the marker %s of the channel 1_2 to %s.' % (channel, high_level))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(1)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1,2.')
+
+        self._visainstrument.write('MARK:VOLT:HIGH %s' % high_level)
+        if self._visainstrument.query('MARK:VOLT:HIGH ?') != high_level:
+            logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
+            raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
+
+    def do_get_marker_high_3_4(self, channel=1):
+        '''
+        Gets the amplitude level of the marker number "channel" of the channel 3 or 4.
+        Input:
+            channel (int): number of the marker. Valid values are 1, 2
+        Output:
+            high_level (float): high level of the marker output in volt.
+        '''
+
+        logging.info( __name__+ ': Getting the marker high level of the marker %s of the channel 3_4.' % (channel))
+
+        if self._visainstrument.query('INST:SEL?') not in (3, 4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+
+
+        return self._visainstrument.query('MARK:VOLT:HIGH?')
+
+    def do_set_marker_high_3_4(self, high_level, channel=1):
+        '''
+        Sets the amplitude level of the marker number "channel" of the channel 3 or 4.
+        Input:
+            channel (int): number of the marker. Valid values are 1, 2.
+            high_level (float): high level of the marker output in volt. Valid values are between 0.5 and 1.2.
+        Output:
+            None
+        '''
+
+        logging.info( __name__+ ': Setting the marker high level of the marker %s of the channel 3_4 to %s.' % (channel, high_level))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+
+        self._visainstrument.write('MARK:VOLT:HIGH %s' % high_level)
+        if self._visainstrument.query('MARK:VOLT:HIGH ?') != high_level:
+            logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
+            raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
+
+    # Internal functions ######################################################
+
+    def channel_select(self,ch_id):
+        """Select the active channel method"""
+        if ch_id in Channels:
+            self._visainstrument.write('INST:SEL{}'.format(ch_id))
+            if self._visainstrument.query('INST:SEL?') != '{}'.format(ch_id):
+                print('''Instrument did not select the channel correctly''')
+        else:
+            print('''The invalid value {} was sent to channel_select method''').format(ch_id)
+            logging.info('The invalid Channel ID {0:d} was sent to set_amplitude'.format(ch_id))
+            raise ValueError('The invalid Channel ID {0:d} was sent to set_amplitude. Valid values are 1,2,3,4.'.format(ch_id))
