@@ -86,7 +86,7 @@ class Tabor_WX1284C(Instrument):
         # self._clock = clock
         # self._numpoints = numpoints
 
-
+        # Add parameters ######################################################
         self.add_parameter('func_mode', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('trigger_mode', type=types.StringType,
@@ -94,9 +94,6 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('output', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
-        # self.add_parameter('all_output', type=types.StringType,
-        #     flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET)
-
         self.add_parameter('coupling', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
@@ -110,54 +107,38 @@ class Tabor_WX1284C(Instrument):
             minval=75, maxval=1250, units='MHz')
         self.add_parameter('clock_source', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
-
         self.add_parameter('amplitude', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
             minval=0.05, maxval=2, units='Volts')
-
-        # self.add_parameter('all_amp', type=types.FloatType,
-        #     flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET,
-        #     minval=0.05, maxval=2, units='Volts')
-
-
         self.add_parameter('offset', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
             minval=-1, maxval=1, units='Volts')
-
-        # self.add_parameter('all_offset', type=types.FloatType,
-        #     flags=Instrument.FLAG_SET | Instrument.FLAG_GET_AFTER_SET,
-        #     minval=-1, maxval=1, units='Volts')
-
         self.add_parameter('trigger_level', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             minval=-5, maxval=5, units='Volts')
-
         self.add_parameter('marker_status_1_2', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1,2), channel_prefix='m%d_')
-
         self.add_parameter('marker_status_3_4', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1,2), channel_prefix='m%d_')
         # self.add_parameter('numpoints', type=types.IntType,
             # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             # minval=192, maxval=16e9, units='Int')
-
-
-
         self.add_parameter('marker_high_1_2', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 2), channel_prefix='m%d_',
             minval=0.5, maxval=1.2, units='Volts')
-
         self.add_parameter('marker_high_3_4', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 2), channel_prefix='m%d_',
             minval=0.5, maxval=1.2, units='Volts')
 
-        # Add functions
+        self.add_parameter('trace_mode', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        # Add functions #######################################################
         self.add_function('clean_visa_open')
         self.add_function('reset')
         self.add_function('clear_err')
@@ -165,7 +146,9 @@ class Tabor_WX1284C(Instrument):
         self.add_function('get_all')
         self.add_function('set_all_amp')
         self.add_function('set_all_offset')
-        #opening the visa session
+        self.add_function('send_waveform')
+
+        #opening the visa session #############################################
         self.clean_visa_open()
 
         if reset:
@@ -286,15 +269,15 @@ class Tabor_WX1284C(Instrument):
         Output:
             None
         '''
-        logging.info( '{} : Initializing channel {0:d}'.format(__name__,channel))
+        logging.info( __name__ +' : Initializing channel {0:d}'.format(channel))
         # Select channel
         self.channel_select(channel)
         # toto._visainstrument.write(":INST:SEL {0:d}".format(channel))
-        
+
         # Set it to 'User-Mode'
-        toto._visainstrument.write(":FUNC:MODE USER")
+        self._visainstrument.write(":FUNC:MODE USER")
         # Set markers-type to 'user-defined' (external)
-        toto._visainstrument.write(":SOUR:MARK:SOUR USER")
+        self._visainstrument.write(":SOUR:MARK:SOUR USER")
 
     def set_all_amp(self, amp):
         '''
@@ -330,6 +313,12 @@ class Tabor_WX1284C(Instrument):
             logging.info('The offset wasn\'t set properly')
             raise ValueError('The offset wasn\'t set properly')
 
+    def send_waveform(self, buffer, ch_id, seg_id):
+        #self._visainstrument.write('TRAC:MODE SING')
+        self._visainstrument.write('TRAC:SEL {}'.format(seg_id))
+        self._visainstrument.write('TRAC:DEF {},{}'.format(seg_id,len(buffer)))
+        err_code = self.download_binary_data(":TRAC:DATA",  buffer, len(buffer) * buffer.itemsize)
+        return err_code
 
     #Parameters ###############################################################
     def do_get_func_mode(self):
@@ -626,7 +615,6 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value %s was sent to set_clock_freq' % freq)
             raise ValueError('The invalid value %s was sent to set_clock_freq. Valid values are from 10 to 1250 MHz with 8-digits precision.' % freq)
 
-
     def do_set_amplitude(self, amp, channel=1):
         '''
         Sets the amplitude of the channel.
@@ -638,18 +626,10 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Setting the amplitude of the channel %s to %s.' %( channel, amp))
 
 
-        # if channel in Channels:
-        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-        #     if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-        #         logging.info('Instrument did not select the channel correctly')
         self.channel_select(channel)
         self._visainstrument.write('VOLT:AMPL %s'% amp)
         if self._visainstrument.query('VOLT:AMPL ?') != amp:
             logging.info('The amplitude wasn\'t set properly')
-
-        # else:
-        #     logging.info('The invalid Channel ID {0:d} was sent to set_amplitude'.format(channel))
-        #     raise ValueError('The invalid Channel ID {0:d} was sent to set_amplitude. Valid values are 1,2,3,4.'.format(channel))
 
     def do_get_amplitude(self, channel=1):
         '''
@@ -662,17 +642,9 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
 
-        # if channel in Channels:
-        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-            # if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-                # logging.info('Instrument did not select the channel correctly')
 
         self.channel_select(channel)
         return self._visainstrument.query('VOLT:AMPL ?')
-        # else:
-        #     logging.info('The invalid Channel ID {0:d} was sent to get_amplitude'.format(channel))
-        #     raise ValueError('The invalid Channel ID {0:d} was sent to get_amplitude. Valid values are 1,2,3,4.'.format(channel))
-        #     return self._visainstrument.query('VOLT:AMPL ?')
 
     def do_set_offset(self, offset, channel=1):
         '''
@@ -685,25 +657,8 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Setting the offset of the channel %s to %s.' %( channel, offset))
 
-        # if channel == 0:
-        #     self._visainstrument.write('VOLT:OFFS:ALL %s'% offset)
-        #     if self._visainstrument.query('VOLT:OFFS:ALL ?') != offset:
-        #         logging.info('The offset wasn\'t set properly')
-        #         raise ValueError('The offsset wasn\'t set properly to all channels by set_offset.')
-        # we may want to have the possibility to set or get the offset of the fours channels at the same time.
-        # We may have a problem if there is a difference between self._visainstrument.query('VOLT:OFFS ?')
-        # and self._visainstrument.query('VOLT:OFFS:ALL ?')
-
-        # if channel in Channels:
-        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-        #     if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-        #         logging.info('Instrument did not select the channel correctly')
         self.channel_select(channel)
         self._visainstrument.write('VOLT:OFFS %s'% offset)
-        # else:
-        #     logging.info('The invalid Channel ID {0:d} was sent to set_offset'.format(channel))
-        #     raise ValueError('The invalid Channel ID {0:d} was sent to set_offset. Valid values are 1,2,3,4.'.format(channel))
-        #     self._visainstrument.write('VOLT:OFFS %s'% offset)
 
         if self._visainstrument.query('VOLT:OFFS ?') != offset:
             logging.info('The offset wasn\'t set properly')
@@ -718,16 +673,8 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
-
-        # if channel in Channels:
-        #     self._visainstrument.write('INST:SEL{0:d}'.format(channel))
-        #     if self._visainstrument.query('INST:SEL?') != '{0:d}'.format(channel):
-        #         logging.info('Instrument did not select the channel correctly')
         self.channel_select(channel)
         return self._visainstrument.query('VOLT:OFFS ?')
-        # else:
-        #     logging.info('The invalid Channel ID {0:d} was sent to get_offset'.format(channel))
-        #     raise ValueError('The invalid Channel ID {0:d} was sent to get_offset. Valid values are 1,2,3,4.'.format(channel))
 
     def do_set_trigger_level(self, trig_val):
         '''
@@ -969,10 +916,43 @@ class Tabor_WX1284C(Instrument):
             logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
             raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
 
+    def do_get_trace_mode(self):
+        '''
+        Gets how the arbitrary waveform is downloaded to the unit memory.
+        Input:
+            None
+        Output:
+            mode (string): possible values are 'SINGl' 'DUPL' 'ZER'  'COMB'
+        '''
+        logging.info( __name__+ ': Getting how the arbitrary waveform is downloaded to the unit memory.')
+        return self._visainstrument.query('TRAC:MODE ?')
+
+    def do_set_trace_mode(self, mode='SING'):
+        '''
+        Sets how the arbitrary waveform is downloaded to the unit memory.
+        Input:
+            mode (string): possible values are 'SING' 'DUPL' 'ZER'  'COMB'
+        Output:
+            none
+        '''
+        logging.info( __name__+ ': Setting how the arbitrary waveform is downloaded to the unit memory.')
+
+        if mode.upper() in ('SING', 'DUPL', 'ZER', 'COMB'):
+            self._visainstrument.write('TRAC:MODE %s' %mode.upper())
+
+            if self._visainstrument.query('TRAC:MODE ?') != mode.upper():
+                logging.info('Instrument did not set correctly the mode of the trace arbitrary waveform')
+                raise ValueError('Instrument did not set correctly the mode of the trace arbitrary waveform')
+        else:
+            logging.info('The invalid value %s was sent to set_clock_source' % mode.upper())
+            raise ValueError('The invalid value %s was sent to set_clock_source. Valid values are \'SING\' , \'DUPL\', \'ZER\' or \'COMB\'.' % mode.upper())
+
     # Internal functions ######################################################
 
     def channel_select(self,ch_id):
-        """Select the active channel method"""
+        """
+        Select the active channel method
+        """
         if ch_id in Channels:
             self._visainstrument.write('INST:SEL{}'.format(ch_id))
             if self._visainstrument.query('INST:SEL?') != '{}'.format(ch_id):
@@ -981,3 +961,179 @@ class Tabor_WX1284C(Instrument):
             print('''The invalid value {} was sent to channel_select method''').format(ch_id)
             logging.info('The invalid Channel ID {0:d} was sent to set_amplitude'.format(ch_id))
             raise ValueError('The invalid Channel ID {0:d} was sent to set_amplitude. Valid values are 1,2,3,4.'.format(ch_id))
+
+    def download_binary_data(self, msg, bin_dat, dat_size):
+        """
+        Download binary data to device.
+        Notes:
+          1. The caller needs not add the binary-data header (#<data-length>)
+          2. The preceding-message is usually a SCPI string (e.g :'TRAC:DATA')
+
+        Inputs:
+            msg: the preceding string message.
+            bin_dat: the binary data buffer.
+            dat_size: the data-size in bytes.
+        Output:
+            visa-error-code.
+        """
+
+        intf_type = self._visainstrument.get_visa_attribute(vc.VI_ATTR_INTF_TYPE)
+        if intf_type == vc.VI_INTF_GPIB:
+            _ = self._visainstrument.write("*OPC?")
+            for _ in range(2000):
+                status_byte = self._visainstrument.stb
+                if (status_byte & 0x10) == 0x10:
+                    break
+            _ = self._visainstrument.read()
+            max_chunk_size = 30000L
+            orig_tmout = self._visainstrument.timeout
+            if orig_tmout < dat_size / 20:
+                self._visainstrument.timeout = long(dat_size / 20)
+        else:
+            max_chunk_size = 256000L
+
+        dat_sz_str = "{0:d}".format(dat_size)
+        dat_header = msg + " #{0:d}{1}".format(len(dat_sz_str), dat_sz_str)
+
+        ret = 0L
+        p_dat = ctypes.cast(dat_header, ctypes.POINTER(ctypes.c_byte))
+        ul_sz = ctypes.c_ulong(len(dat_header))
+        p_ret = ctypes.cast(ret, ctypes.POINTER(ctypes.c_ulong))
+        err_code = self._visainstrument.visalib.viWrite(self._visainstrument.session, p_dat, ul_sz, p_ret)
+
+        if err_code < 0:
+            print "Failed to write binary-data header. error-code=0x{0:x}".format(err_code)
+            return err_code
+
+        ul_sz = ctypes.c_ulong(dat_size)
+        if isinstance(bin_dat, np.ndarray):
+            p_dat = bin_dat.ctypes.data_as(ctypes.POINTER(ctypes.c_byte))
+        else:
+            p_dat = ctypes.cast(bin_dat, ctypes.POINTER(ctypes.c_byte))
+
+        if dat_size <= max_chunk_size:
+            err_code = self._visainstrument.visalib.viWrite(self._visainstrument.session, p_dat, ul_sz, p_ret)
+        else:
+            wr_offs = 0
+            while wr_offs < dat_size:
+                chunk_sz = min(max_chunk_size, dat_size - wr_offs)
+                ul_sz = ctypes.c_ulong(chunk_sz)
+                ptr = ctypes.cast(ctypes.addressof(p_dat.contents) + wr_offs, ctypes.POINTER(ctypes.c_byte))
+                err_code = self._visainstrument.visalib.viWrite(self._visainstrument.session, ptr, ul_sz, p_ret)
+                if err_code < 0:
+                    break
+                wr_offs = wr_offs + chunk_sz
+
+        #self._visainstrument.clear()
+        if err_code < 0:
+            print "Failed to write binary-data. error-code=0x{0:x}".format(err_code)
+
+        return err_code
+
+    def add_marker_flag(self, marker_idx, start_point, len_in_pts, buffer):
+        """Add marker flag to given pulse at the specified time-interval.
+
+        :param marker_idx: marker index (either 0 or 1)
+        :param start_time: the marker start time
+        :param time_span: the marker time span
+        """
+        marker_idx = int(marker_idx)
+        ex_dat = 0
+        if marker_idx == 0:
+            ex_dat = _EX_DAT_MARKER_1_MASK
+        elif marker_idx == 1:
+            ex_dat = _EX_DAT_MARKER_2_MASK
+        else:
+            raise TypeError("marker_idx should be either 0 or 1")
+
+        if start_point % MARKER_QUANTUM != 0 or len_in_pts % MARKER_QUANTUM != 0:
+            warnings.warn("the marker-interval was rounded!")
+            start_point = (start_point // MARKER_QUANTUM) * MARKER_QUANTUM
+            len_in_pts = (len_in_pts // MARKER_QUANTUM) * MARKER_QUANTUM
+
+        intervals = self._normalize_interval(start_point, len_in_pts)
+        self._add_extra_data(ex_dat, intervals)
+
+    def add_markers_mask(self, marker_idx, offset, length, dat_buff, dat_buff_start_offs):
+        """Add markers mask to given buffer of wave-data. """
+        mask = 0
+        if marker_idx == 2:
+            mask |= 0x8000
+        if marker_idx == 1:
+            mask |= 0x4000
+
+        offset = long(offset // 2)
+        length = long(length // 2)
+
+        if 0 == mask or length == 0: return
+
+        k = long(dat_buff_start_offs)
+        j = (offset // 8) * 16 + (offset % 8)
+        m = 8
+        for i in range(j, j + length):
+            if i % 16 == 0:
+                m += 8
+            dat_buff[k + i + m] |= mask
+
+
+    def seq_mode(self, value='STEP'):
+        """sequence mode setter method"""
+        if value in ('AUTO','ONCE','STEP'):
+            self._visainstrument.write('SEQ:ADV{}'.format(value))
+            if self._visainstrument.query('SEQ:ADV?') !=value:
+                print('''Instrument did not set correctly the sequence mode''')
+        else:
+            print('''The invalid value {} was sent to seq_mode method''').format(value)
+
+    def seq_jump_source(self,value='BUS'):
+        """sequence jump source setter method: in Auto and Stepped mode, a jump signal is required to reach the next step of the sequence.
+        This jump can be either a trig (BUS) or being input on the Event input port (EVEN)"""
+        if value in ('BUS','EVEN'):
+            self._visainstrument.write('SEQ:JUMP{}'.format(value))
+            if self._visainstrument.query('SEQ:JUMP?') !=value:
+                print('''Instrument did not set correctly the sequence jump source''')
+        else:
+            print('''The invalid value {} was sent to seq_jump_source method''').format(value)
+
+    def create_wvf_steps_info_buff(self, buffer):
+        """Create buffer of the specifid wvf's steps info.
+
+        It can be used for downloading sequence-definition as binary-data.
+        Note that each wvf has individual sequence (of sequencer steps).
+
+        Important:
+        The steps consist segment-numbers that should fit
+        the actual segments in the device's arbitrary-memory.
+        The assumption is that the script's segments correspond to
+        segments number: n, n+1, n+2, .. in the device's arbitrary-memory
+        where n is the number of the first one (i.e. `n = first_seg_nb`).
+
+        :buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
+        :returns: a `numpy.array` (of bytes) with the wvf's steps-info.
+        """
+
+
+        # define packed struct of: uint32, uint16, uint8 and pad byte
+        # (in little-endian bytes order)
+        s = struct.Struct('< L H B x')
+
+        num_steps = len(buffer)
+        s_size = s.size
+
+        m = np.empty(s_size * num_steps, dtype='uint8')
+        jump_flag = 0
+        for i in range(num_steps):
+            s.pack_into(m, i * s_size, buffer[i,0], buffer[i,1], buffer[i,2])
+        return m
+
+    def send_seq(self,buffer,seq_id):
+        """ This method loads a sequence with number seq_id into the AWG.
+        :buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
+        :seq_id: the number of the sequence to be loaded
+        """
+        #select the relevant sequence
+        self._visainstrument.write(":SEQ:SEL {0:d}".format(seq_id))
+        # Create packed binary buffer with the sequence info ..
+        buff=self.create_wvf_steps_info_buff(buffer)
+        # and download the sequence info ..
+        self.download_binary_data(":SEQ:DATA", buff, len(buff) * buff.itemsize)
