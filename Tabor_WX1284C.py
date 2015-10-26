@@ -30,6 +30,11 @@ import ctypes
 MARKER_QUANTUM = 2        #: quantum of marker-length and marker-offset
 _EX_DAT_MARKER_1_MASK = 0x20000000L #: the mask of marker 1 in the extra-data (32-bits) value
 _EX_DAT_MARKER_2_MASK = 0x10000000L #: the mask of marker 2 in the extra-data (32-bits) value
+_EX_DAT_M2_MASK_NICO = 0x8000
+_EX_DAT_M1_MASK_NICO = 0x4000
+octet = 8
+number_of_bits = 16
+
 Channels=(1,2,3,4)
 Mark_num = (1,2)
 ###### Useful functions
@@ -135,7 +140,6 @@ class Tabor_WX1284C(Instrument):
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 2), channel_prefix='m%d_',
             minval=0.5, maxval=1.2, units='Volts')
-
         self.add_parameter('trace_mode', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         # Add functions #######################################################
@@ -213,6 +217,19 @@ class Tabor_WX1284C(Instrument):
         logging.info(__name__ + ' : Resetting instrument')
         self._visainstrument.write('*RST')
 
+    def clear_err(self):
+        '''
+        Clears the error queue of the instrument
+
+        Input:
+            None
+
+        Output:
+            None
+        '''
+        logging.info(__name__ + ' : Clearing error queue of the instrument')
+        self._visainstrument.write('*CLS')
+
     def get_all(self):
         '''
         Reads all implemented parameters from the instrument,
@@ -233,6 +250,7 @@ class Tabor_WX1284C(Instrument):
         self.get_clock_source()
         self.get_clock_freq()
         self.get_trigger_level()
+        self.get_trace_mode()
 
         for i in Channels:
             self.get('ch%d_output' % i)
@@ -245,19 +263,6 @@ class Tabor_WX1284C(Instrument):
             self.get('m%d_marker_status_3_4' % i)
             self.get('m%d_marker_high_1_2' % i)
             self.get('m%d_marker_high_3_4' % i)
-
-    def clear_err(self):
-        '''
-        Clears the error queue of the instrument
-
-        Input:
-            None
-
-        Output:
-            None
-        '''
-        logging.info(__name__ + ' : Clearing error queue of the instrument')
-        self._visainstrument.write('*CLS')
 
     def init_channel(self,channel=1):
         '''
@@ -272,8 +277,6 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__ +' : Initializing channel {0:d}'.format(channel))
         # Select channel
         self.channel_select(channel)
-        # toto._visainstrument.write(":INST:SEL {0:d}".format(channel))
-
         # Set it to 'User-Mode'
         self._visainstrument.write(":FUNC:MODE USER")
         # Set markers-type to 'user-defined' (external)
@@ -283,7 +286,7 @@ class Tabor_WX1284C(Instrument):
         '''
         Sets the amplitude of all 4 channels at the same time.
         Input:
-            amp (float): amplitude of the channel in [V]
+            amp (float): amplitude of the channels in [V]
         Output:
             None
         '''
@@ -300,13 +303,11 @@ class Tabor_WX1284C(Instrument):
         '''
         Sets the offset of all 4 channels at the same time.
         Input:
-            offset (float): offset in [V]
+            offset (float): offset for the channels in [V]
         Output:
             None
         '''
         logging.info( __name__+ ': Setting the offset of the 4 channels to %s.' %(offset) )
-
-        # self._visainstrument.write('OUTP:COUP:ALL DC')
 
         self._visainstrument.write('VOLT:OFFS:ALL %s'% offset)
         if self._visainstrument.query('VOLT:OFFS ?') != offset:
@@ -314,7 +315,17 @@ class Tabor_WX1284C(Instrument):
             raise ValueError('The offset wasn\'t set properly')
 
     def send_waveform(self, buffer, ch_id, seg_id):
+        '''
+        Sets the active waveform segment seg_id at the output connector ch_id and then download the waveform data buffer to the WX2184C waveform memory.
+        Inputs:
+            buffer: the binary data buffer.
+            ch_id (int): channel index. Valid values are 1, 2, 3 and 4.
+            seg_id (int): segment index. Between 1 and 32 000.
+        Output:
+            visa-error-code
+        '''
         #self._visainstrument.write('TRAC:MODE SING')
+        self.channel_select(ch_id)
         self._visainstrument.write('TRAC:SEL {}'.format(seg_id))
         self._visainstrument.write('TRAC:DEF {},{}'.format(seg_id,len(buffer)))
         err_code = self.download_binary_data(":TRAC:DATA",  buffer, len(buffer) * buffer.itemsize)
@@ -951,7 +962,11 @@ class Tabor_WX1284C(Instrument):
 
     def channel_select(self,ch_id):
         """
-        Select the active channel method
+        Select the active channel method.
+        Input:
+            ch_id (int): index of the channel to select.
+        Output:
+            None
         """
         if ch_id in Channels:
             self._visainstrument.write('INST:SEL{}'.format(ch_id))
@@ -1031,11 +1046,14 @@ class Tabor_WX1284C(Instrument):
         return err_code
 
     def add_marker_flag(self, marker_idx, start_point, len_in_pts, buffer):
-        """Add marker flag to given pulse at the specified time-interval.
-
-        :param marker_idx: marker index (either 0 or 1)
-        :param start_time: the marker start time
-        :param time_span: the marker time span
+        """
+        Add marker flag to given pulse at the specified time-interval.
+        Inputs:
+            :param marker_idx: marker index (either 0 or 1)
+            :param start_time: the marker start time
+            :param time_span: the marker time span
+        Output:
+            None
         """
         marker_idx = int(marker_idx)
         ex_dat = 0
@@ -1054,40 +1072,202 @@ class Tabor_WX1284C(Instrument):
         intervals = self._normalize_interval(start_point, len_in_pts)
         self._add_extra_data(ex_dat, intervals)
 
+    def _normalize_interval(self, intrv_start, intrv_len):
+        """Normalize sub-interval of the waveform interval.
+
+        The sub-interval is relative to single-period of the waveform,
+        (but may be offset, so not necessarily contained in the 1st period).
+
+        The returnd normalized-intervals list contains zero or more
+        2-tuples of the form: `(<start_point_index>,<length in points>)`
+        that represent sub-intervals of the duplicated waveform.
+
+        :param intrv_start: the sub-interval start point index.
+        :param intrv_len: the sub-interval length in points.
+        :returns: list of normalized-intervals in the waveform intervals.
+        """
+        if intrv_len >= self.period_len:
+            return [(0, self.period_len * self.num_periods)]
+        if intrv_len < 1:
+            return []
+        intrv_end = intrv_start + intrv_len
+
+        if intrv_start >= 0 and intrv_end <= self.period_len:
+            if self.is_for_trigger_mode:
+                return [(intrv_start, intrv_len)]
+            else:
+                return [(intrv_start + i * self.period_len, intrv_len)
+                        for i in range(self.num_periods)]
+
+        if self.is_for_trigger_mode:
+            intrv_start = max(intrv_start, Decimal(0))
+            intrv_end = min(intrv_end, self.period_len * self.num_periods)
+            if intrv_end <= intrv_start:
+                return []
+            return [(intrv_start, intrv_end - intrv_start)]
+
+        idxs = [intrv_start, intrv_end]
+
+        q = intrv_start / self.period_len
+        q = q.to_integral_exact(rounding=ROUND_FLOOR)
+        if not q.is_zero():
+            for i in range(len(idxs)):
+                idxs[i] = idxs[i] - q * self.period_len
+                idxs[i] = idxs[i].to_integral()
+                idxs[i] = max(idxs[i], Decimal(0))
+                idxs[i] = min(idxs[i], self.period_len)
+
+        if idxs[0] == idxs[1]:
+            return []
+
+        if idxs[0] < idxs[1]:
+            return [(idxs[0] + i * self.period_len, idxs[1] - idxs[0])
+                    for i in range(self.num_periods)]
+
+        intervals = []
+        for i in range(self.num_periods):
+            intrv_1 = (i * self.period_len, idxs[1] + i * self.period_len)
+            intrv_2 = (idxs[0] + i * self.period_len, (i + 1) * self.period_len)
+            intervals.append(intrv_1)
+            intervals.append(intrv_2)
+        return intervals
+
+    def _add_extra_data(self, ex_dat, intervals):
+        """
+        Add extra-data to at the specified intervals of the waveform.
+
+        The 'extra-data' is a 32-bits value composed of:
+          - markers-flags (2-bits)
+          - digital-data mask (28-bits)
+          - spare (2-bits)
+
+        The intervals-list consists of zero or more 2-tuples
+        of the form: `(<first_point_index>,<length_in_points>)`
+        that represent normalized intervals in the duplicated waveform.
+
+
+        :param ex_dat: the extra-data (32-bits value)
+        :param intervals: list of sub-intervals in the waveform.
+        """
+        if len(intervals) == 0:
+            return
+
+        ex_dat = self._convert_to_long(ex_dat)
+
+        new_sub_segs = []
+        pos = Decimal(0)
+
+
+        i = 0
+        first_pt = intervals[i][0]
+        last_pt = first_pt + intervals[i][1]
+
+
+        for sub_seg in self._sub_lin_segs:
+            while pos > last_pt and i + 1 < len(intervals):
+                i += 1
+                first_pt = intervals[i][0]
+                last_pt = first_pt + intervals[i][1]
+
+            if (pos + sub_seg.length <= first_pt or pos >= last_pt or first_pt > last_pt):
+                new_sub_segs.append(sub_seg)
+                pos += sub_seg.length
+                continue
+
+            p0 = pos
+            p1 = max(p0, first_pt)
+            p2 = min(p0 + sub_seg.length, last_pt)
+            p3 = p0 + sub_seg.length
+
+            if p1 > p0:
+                new_sub_seg = LinSubSeg(
+                        sub_seg.ext_len,
+                        sub_seg.ext_v0,
+                        sub_seg.ext_v1,
+                        sub_seg.sub_offs,
+                        p1 - p0,
+                        sub_seg.ex_dat)
+                new_sub_segs.append(new_sub_seg)
+
+            new_sub_seg = LinSubSeg(
+                    sub_seg.ext_len,
+                    sub_seg.ext_v0,
+                    sub_seg.ext_v1,
+                    sub_seg.sub_offs + p1 - p0,
+                    p2 - p1,
+                    sub_seg.ex_dat | ex_dat)
+            new_sub_segs.append(new_sub_seg)
+
+            if p3 > p2:
+                new_sub_seg = LinSubSeg(
+                        sub_seg.ext_len,
+                        sub_seg.ext_v0,
+                        sub_seg.ext_v1,
+                        sub_seg.sub_offs + p2 - p0,
+                        p3 - p2,
+                        sub_seg.ex_dat)
+                new_sub_segs.append(new_sub_seg)
+
+            pos += sub_seg.length
+
+        self._sub_lin_segs = new_sub_segs
+
     def add_markers_mask(self, marker_idx, offset, length, dat_buff, dat_buff_start_offs):
-        """Add markers mask to given buffer of wave-data. """
+        """
+        Add markers mask to given buffer of wave-data.
+        Inputs:
+            marker_idx (int): index of the marker. Valid values are 1 or 2.
+            offset (): offset on the position of the marker
+            length (): length or width of the marker signal. Had to be superior or egual to 2.
+            dat_buff : the given buffer of wave data
+            dat_buff_start_offs: offset on the
+        Output:
+            None
+        """
         mask = 0
-        if marker_idx == 2:
-            mask |= 0x8000
+        # |= takes the hexidecimal value into a decimal value.
         if marker_idx == 1:
-            mask |= 0x4000
+            mask |= _EX_DAT_M1_MASK_NICO
+        if marker_idx == 2:
+            mask |= _EX_DAT_M2_MASK_NICO
 
-        offset = long(offset // 2)
-        length = long(length // 2)
+        # // takes the integer part of the division.
+        offset = long(offset // MARKER_QUANTUM)
+        length = long(length // MARKER_QUANTUM)
 
-        if 0 == mask or length == 0: return
+        if mask == 0 or length == 0:
+            print('''Wrong value of marker_idx or length. The marker_idx has to be 1 or 2. length should be superior or egal to 2 ?''')
+            # you should verify the assertion on length
+            return
 
+        # % takes the modulo
         k = long(dat_buff_start_offs)
-        j = (offset // 8) * 16 + (offset % 8)
-        m = 8
+        j = (offset // octet) * number_of_bits + (offset % octet) # j is a multiple of 16 or one of the seven following value of the multiple.
+        m = octet
         for i in range(j, j + length):
-            if i % 16 == 0:
-                m += 8
+            if i % number_of_bits == 0:
+                m += octet
             dat_buff[k + i + m] |= mask
 
-
     def seq_mode(self, value='STEP'):
-        """sequence mode setter method"""
+        """
+        Sequence mode setter method.
+        """
+
         if value in ('AUTO','ONCE','STEP'):
             self._visainstrument.write('SEQ:ADV{}'.format(value))
-            if self._visainstrument.query('SEQ:ADV?') !=value:
+            if self._visainstrument.query('SEQ:ADV?') != value:
                 print('''Instrument did not set correctly the sequence mode''')
         else:
             print('''The invalid value {} was sent to seq_mode method''').format(value)
 
     def seq_jump_source(self,value='BUS'):
-        """sequence jump source setter method: in Auto and Stepped mode, a jump signal is required to reach the next step of the sequence.
-        This jump can be either a trig (BUS) or being input on the Event input port (EVEN)"""
+        """
+        Sequence jump source setter method: in AUTOmatic and STEPped mode only, a jump signal is required to reach the next step of the sequence.
+        This jump can be either a trig (BUS) or being input on the Event input port (EVEN).
+        """
+        if self._visainstrument.query('SEQ:ADV?') not in ('AUTO', 'STEP'):
+            raise ValueError('The sequence mode should be in AUTOmatic or in STEPped in order to use the seq_jump_source')
         if value in ('BUS','EVEN'):
             self._visainstrument.write('SEQ:JUMP{}'.format(value))
             if self._visainstrument.query('SEQ:JUMP?') !=value:
@@ -1096,7 +1276,8 @@ class Tabor_WX1284C(Instrument):
             print('''The invalid value {} was sent to seq_jump_source method''').format(value)
 
     def create_wvf_steps_info_buff(self, buffer):
-        """Create buffer of the specifid wvf's steps info.
+        """
+        Create buffer of the specified waveform's steps info.
 
         It can be used for downloading sequence-definition as binary-data.
         Note that each wvf has individual sequence (of sequencer steps).
@@ -1107,9 +1288,10 @@ class Tabor_WX1284C(Instrument):
         The assumption is that the script's segments correspond to
         segments number: n, n+1, n+2, .. in the device's arbitrary-memory
         where n is the number of the first one (i.e. `n = first_seg_nb`).
-
-        :buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
-        :returns: a `numpy.array` (of bytes) with the wvf's steps-info.
+        Inputs:
+            buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
+        Output:
+            m: a `numpy.array` (of bytes) with the wvf's steps-info.
         """
 
 
@@ -1127,9 +1309,13 @@ class Tabor_WX1284C(Instrument):
         return m
 
     def send_seq(self,buffer,seq_id):
-        """ This method loads a sequence with number seq_id into the AWG.
-        :buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
-        :seq_id: the number of the sequence to be loaded
+        """
+        This method loads a sequence with number seq_id into the AWG.
+        Inputs:
+            buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
+            seq_id (int): the number of the sequence to be loaded. Value between 1 and 1 000.
+        Output:
+            None
         """
         #select the relevant sequence
         self._visainstrument.write(":SEQ:SEL {0:d}".format(seq_id))
