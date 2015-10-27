@@ -17,7 +17,6 @@
 
 from instrument import Instrument
 import types
-import visa
 import time
 import multiprocessing as mp
 from ATS9360 import atsapi as ats
@@ -25,16 +24,13 @@ from ATS9360 import sub_process
 from ATS9360 import data_treatment
 import numpy as np
 import ctypes
-from ATS9360.plot import AtsPlot
+# from ATS9360.plot import AtsPlot
 from ATS9360.plot2 import plot_test
-
-
-from pyqtgraph.Qt import QtGui, QtCore
-import pyqtgraph as pg
 
 class ATS9360_NPT(Instrument):
 
     def __init__(self, name, address=None):
+
         Instrument.__init__(self, name, tags=['measure'])
 
         self.add_parameter('clock_source',
@@ -310,7 +306,6 @@ class ATS9360_NPT(Instrument):
         manager         = mp.Manager()
         finish          = manager.list([False]*self.nb_process_data_treatment)
 
-
         queue_plot = mp.Queue()
 
         # We get the manager containing all experiment parameters
@@ -333,10 +328,11 @@ class ATS9360_NPT(Instrument):
         # We create the Process
         # At this point the process is not start
         worker_plot = mp.Process(target = plot_test,
-                                         args   = (queue_plot,
+                                         args   = (queue_treatment,
                                                    finish,
                                                    parameters))
         worker_plot.start()
+
         # We create the Process
         # At this point the process is not start
         worker_acquire_data = mp.Process(target = sub_process.get_data,

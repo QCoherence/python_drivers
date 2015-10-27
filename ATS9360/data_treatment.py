@@ -47,9 +47,9 @@ class Average(object):
         data_cha = data_volt[0::2]
         data_chb = data_volt[1::2]
 
-
         records_per_buffer = parameters['records_per_buffer']
         acquired_samples   = parameters['acquired_samples']
+
         # We reshape them in 2D-array to enhance the averaging
         data_cha = np.reshape(data_cha, (records_per_buffer,
                                          acquired_samples))
@@ -92,7 +92,7 @@ class Average(object):
         pass
 
 
-    def process(self, queue_data, queue_plot, treat_data, parameters,
+    def process(self, queue_data, queue_plot, queue_treatment, parameters,
                       finish, index_processus):
 
         # The number of buffer to handle
@@ -110,6 +110,8 @@ class Average(object):
 
         for i in range(nb_buffer):
 
+            # print float(i)*100./nb_buffer
+
             # We get data from the queue
             data = queue_data.get()
 
@@ -121,13 +123,14 @@ class Average(object):
 
             # if it is the first data treatment we have to put data
             # For the other iterations, we get data first
-            if not any(finish):
-                treat_data.put(data_cha)
-                queue_plot.put(data_cha)
-            else:
-                t = (treat_data.get() + data_cha)/2.
-                treat_data.put(t)
-                queue_plot.put(t)
+            # if i == 0 and not any(finish):
+            #     queue_treatment.put(data_chb)
+            #     queue_plot.put(data_chb)
+            # else:
+            #     t = (queue_treatment.get() + data_chb)/2.
+            #     queue_treatment.put(t)
+            #     queue_plot.put(t)
+            queue_treatment.put(data_chb)
 
         # We inform the main loop that the process of data treatment is finished
         finish[index_processus] = True
