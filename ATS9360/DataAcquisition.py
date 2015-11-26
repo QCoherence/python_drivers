@@ -1,16 +1,14 @@
 from __future__ import division
+import ctypes
 import numpy as np
-import os
-import signal
-import sys
 import time
 import atsapi as ats
 
-class data_transfert(object):
-
-    def __init__(self):
-        print 't'
-
+class DataAcquisition(object):
+    """
+        Class handling the acquisition of data from the ATS board.
+        Basically, user should only use the get_data method.
+    """
 
 
 
@@ -146,6 +144,10 @@ class data_transfert(object):
 
 
     def prepare_acquisition(self, board, parameters):
+        """
+            Prepare the DMA buffers for the board.
+            Return a list of buffers
+        """
 
         samplesPerSec         = parameters['samplerate']*1e6
 
@@ -174,10 +176,19 @@ class data_transfert(object):
         # Select number of DMA buffers to allocate
         bufferCount = parameters['nb_buffer_allocated']
 
-        # Create and set the buffers
+        # Modified per Etienne.
+        # Alazar gave bytesPerSample > 8 but this condition seemed strange to
+        # me considering the previous code bytesPerSample   = (bitsPerSample.value + 7) // 8
+
+        # Allocate DMA buffers
+        sample_type = ctypes.c_uint8
+        if bytesPerSample > 1:
+            sample_type = ctypes.c_uint16
+
         buffers = []
         for i in range(bufferCount):
-            buffers.append(ats.DMABuffer(bytesPerSample, bytesPerBuffer))
+            buffers.append(ats.DMABuffer(sample_type, bytesPerBuffer))
+
 
         board.setRecordSize(preTriggerSamples, postTriggerSamples)
 
@@ -201,36 +212,44 @@ class data_transfert(object):
 
 
 
-    def data_acquisition(self, board, queue_data, parameters, buffers):
+    def data_acquisition(self, board, queue_data_cha, queue_data_chb, parameters, buffers):
+        """
+            Acquire data and put them in the FIFO queue_data buffer memory.
 
-        # Get buffers
-        buffers               = buffers
+            Output buffersCompleted (int): Number of emptied buffer.
+        """
+
         buffersPerAcquisition = parameters['buffers_per_acquisition']
         recordsPerBuffer      = parameters['records_per_buffer']
-        preTriggerSamples     = 0
+        preTriggerSamples     = 0 # NPT mode
         postTriggerSamples    = parameters['acquired_samples']
         samplesPerRecord      = preTriggerSamples + postTriggerSamples
 
         start = time.clock() # Keep track of when acquisition started
         board.startCapture() # Start the acquisition
 
-        message = 'Capturing %d buffers\n' % buffersPerAcquisition
+        message = 'Attempt to capture %d buffers\n' % buffersPerAcquisition
         buffersCompleted = 0
         bytesTransferred = 0
 
-        while buffersCompleted < buffersPerAcquisition:
+        # We measure up to have empty all the buffers set by the user or
+        # if the user stop the measurement
+        while buffersCompleted < buffersPerAcquisition and parameters['measuring']:
 
             buff = buffers[buffersCompleted % len(buffers)]
             board.waitAsyncBufferComplete(buff.addr, timeout_ms=5000)
 
-
             buffersCompleted += 1
             bytesTransferred += buff.size_bytes
 
-            queue_data.put(buff.buffer)
+            queue_data_cha.put(np.copy(buff.buffer[0::2]))
+            queue_data_chb.put(np.copy(buff.buffer[1::2]))
+            # a = buff.buffer[0::2] >> 4
+            # b = buff.buffer[1::2] >> 4
+            # queue_data_cha.put_nowait(400e-3*(a - 2047.5)/2047.5)
+            # queue_data_chb.put_nowait(400e-3*(b - 2047.5)/2047.5)
 
-            # Update progress bar
-            #waitBar.setProgress(buffersCompleted / buffersPerAcquisition)
+
 
             # Add the buffer to the end of the list of available buffers.
             board.postAsyncBuffer(buff.addr, buff.size_bytes)
@@ -241,7 +260,7 @@ class data_transfert(object):
         buffersPerSec      = 0
         bytesPerSec        = 0
         recordsPerSec      = 0
-        samplesTransferred = samplesPerRecord*recordsPerBuffer*buffersPerAcquisition
+        samplesTransferred = samplesPerRecord*recordsPerBuffer*buffersCompleted*2
         if transferTime_sec > 0:
             buffersPerSec = buffersCompleted / transferTime_sec
             bytesPerSec   = bytesTransferred / transferTime_sec
@@ -250,12 +269,29 @@ class data_transfert(object):
 
         message += 'Captured %d buffers (%f buffers per sec)\n' % (buffersCompleted, buffersPerSec)
         message += 'Captured %d records (%f records per sec)\n' % (recordsPerBuffer * buffersCompleted, recordsPerSec)
-        message += 'Transferred %d bytes (%f Gbytes per sec)\n' % (bytesTransferred, bytesPerSec/1024**3.)
-        message += 'Transferred %d samples (%f GS per sec)\n' % (samplesTransferred, samplePerSec/1e9)
+        message += 'Transferred %d bytes (%f Mbytes per sec)\n' % (bytesTransferred, bytesPerSec/1024**2.)
+        message += 'Transferred %d samples (%f MS per sec)\n' % (samplesTransferred, samplePerSec/1e6)
 
         parameters['message'] = message
 
-    def get_data(self, queue_data, parameters):
+        return buffersCompleted
+
+
+
+    def get_data(self, queue_data_cha, queue_data_chb, parameters):
+        """
+            Method allowing the transfert of data from the board to the computer.
+            The board is instanced following the parameters input and data are
+            transfert to the queue_data memory buffer.
+
+            Input:
+                - queue_data_cha: FIFO memory buffer instance from the
+                               multiprocess library.
+                - queue_data_chb: FIFO memory buffer instance from the
+                               multiprocess library.
+                - parameters: Dictionnary with all board parameters instance
+                              from multiprocess library
+        """
 
         # We instance a board object
         # All the parameters of the measurement will be set on this instance
@@ -273,8 +309,20 @@ class data_transfert(object):
         # We prepare the acquisition
         buffers = self.prepare_acquisition(board, parameters)
 
-        # We launch the data acquisition
-        self.data_acquisition(board, queue_data, parameters, buffers)
+        # We wait a little to let the time to the board to initialize itself
+        time.sleep(0.5)
 
-        # We abort transfer.
+        # We launch the data acquisition
+        parameters['measured_buffers'] = self.data_acquisition(board,
+                                                               queue_data_cha, queue_data_chb,
+                                                               parameters, buffers)
+
+        # We stop the transfer.
         board.abortAsyncRead()
+
+        # We inform the parent process that the board is properly "closed"
+        parameters['safe_acquisition'] = True
+
+        # Once the board is "close" properly, we close the FIFO memory
+        queue_data_cha.close()
+        queue_data_chb.close()

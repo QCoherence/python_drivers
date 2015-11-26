@@ -1,3 +1,4 @@
+# This Python file uses the following encoding: utf-8
 # ATS9360_NPT.py driver for The aquisition board Alzar ATS9360
 # Etienne Dumur <etienne.dumur@neel.cnrs.fr> 2015
 #
@@ -16,21 +17,23 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from instrument import Instrument
+import numpy as np
+import logging
 import types
 import time
 import multiprocessing as mp
+
 from ATS9360 import atsapi as ats
-from ATS9360 import sub_process
-from ATS9360 import data_treatment
-import numpy as np
-import ctypes
-# from ATS9360.plot import AtsPlot
-from ATS9360.plot2 import plot_test
+from ATS9360.DataAcquisition import DataAcquisition
+data_acquisition = DataAcquisition()
 
 class ATS9360_NPT(Instrument):
 
-    def __init__(self, name, address=None):
 
+
+    def __init__(self, name):
+
+        logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['measure'])
 
         self.add_parameter('clock_source',
@@ -42,7 +45,7 @@ class ATS9360_NPT(Instrument):
         self.add_parameter('clock_edge',
             type        = types.StringType,
             flags       = Instrument.FLAG_GETSET,
-            option_list = ('rising', 'falling'),
+            option_list = ('rising', 'falling')
             )
 
         self.add_parameter('samplerate',
@@ -82,30 +85,36 @@ class ATS9360_NPT(Instrument):
             units       = 'ns'
             )
 
-        self.add_parameter('acquired_samples',
+        # self.add_parameter('acquired_samples',
+        #     type        = types.IntType,
+        #     flags       = Instrument.FLAG_GETSET,
+        #     units       = 'S'
+        #     )
+
+        # self.add_parameter('buffers_per_acquisition',
+        #     type        = types.IntType,
+        #     flags       = Instrument.FLAG_GETSET
+        #     )
+        #
+        # self.add_parameter('records_per_buffer',
+        #     type        = types.IntType,
+        #     flags       = Instrument.FLAG_GETSET
+        #     )
+        #
+        # self.add_parameter('nb_buffer_allocated',
+        #     type        = types.IntType,
+        #     flags       = Instrument.FLAG_GETSET
+        #     )
+
+        self.add_parameter('averaging',
             type        = types.IntType,
+            flags       = Instrument.FLAG_GETSET
+            )
+
+        self.add_parameter('completed_acquisition',
+            type        = types.FloatType,
             flags       = Instrument.FLAG_GET,
-            units       = 'S'
-            )
-
-        self.add_parameter('buffers_per_acquisition',
-            type        = types.IntType,
-            flags       = Instrument.FLAG_GETSET,
-            )
-
-        self.add_parameter('records_per_buffer',
-            type        = types.IntType,
-            flags       = Instrument.FLAG_GETSET,
-            )
-
-        self.add_parameter('nb_buffer_allocated',
-            type        = types.IntType,
-            flags       = Instrument.FLAG_GETSET,
-            )
-
-        self.add_parameter('nb_process_data_treatment',
-            type        = types.IntType,
-            flags       = Instrument.FLAG_GETSET,
+            units       = '%'
             )
 
 
@@ -167,16 +176,11 @@ class ATS9360_NPT(Instrument):
         # Attributes of the acquisition
         self.acquired_samples        = 128*80 # In S. Must be integer
         self.acquisition_time        = self.acquired_samples/1.8 # In ns, float
-        self.records_per_buffer      = 20 # Must be integer
-        self.nb_buffer_allocated     = 40 # Must be integer
+        self.records_per_buffer      = 100 # Must be integer
+        self.nb_buffer_allocated     = 4 # Must be integer
         self.buffers_per_acquisition = 200 # Must be integer
 
-        # Attributes of data
-        self.data_cha = None
-        self.data_chb = None
-
-        # Attribut of data treatment
-        self.nb_process_data_treatment = 1
+        self._aquired_buffer = 0.
 
         # For the display, we get all parameters at the end of the
         # initialization
@@ -184,8 +188,9 @@ class ATS9360_NPT(Instrument):
 
 
 
-
     def get_all(self):
+
+        logging.info(__name__ + ' : get all')
 
         self.get_clock_edge()
         self.get_clock_source()
@@ -197,12 +202,13 @@ class ATS9360_NPT(Instrument):
         self.get_trigger_delay()
 
         self.get_acquisition_time()
-        self.get_acquired_samples()
-        self.get_buffers_per_acquisition()
-        self.get_records_per_buffer()
-        self.get_nb_buffer_allocated()
+        self.get_averaging()
+        # self.get_acquired_samples()
+        # self.get_buffers_per_acquisition()
+        # self.get_records_per_buffer()
+        # self.get_nb_buffer_allocated()
 
-        self.get_nb_process_data_treatment()
+        self.get_completed_acquisition()
 
 
 
@@ -213,7 +219,6 @@ class ATS9360_NPT(Instrument):
     #
     #
     #########################################################################
-
 
 
     def _get_bytes_per_buffer(self):
@@ -237,7 +242,6 @@ class ATS9360_NPT(Instrument):
         bytesPerBuffer   = bytesPerRecord * recordsPerBuffer * channelCount
 
         return int(bytesPerBuffer)
-
 
 
 
@@ -268,20 +272,20 @@ class ATS9360_NPT(Instrument):
         parameters['nb_buffer_allocated']     = self.nb_buffer_allocated
         parameters['buffers_per_acquisition'] = self.buffers_per_acquisition
 
-        # correspondence between user parameters and board command
+        # Correspondence between user parameters and board command
         parameters['allow_samplerates']    = self.allow_samplerates
         parameters['allow_clock_edges']    = self.allow_clock_edges
         parameters['allow_clock_sources']  = self.allow_clock_sources
-        parameters['allow_trigger_ranges'] = self.\
-                                                   allow_trigger_ranges
+        parameters['allow_trigger_ranges'] = self.allow_trigger_ranges
         parameters['allow_trigger_slopes'] = self.allow_trigger_slopes
 
-        # Data treatment parameters
-        parameters['nb_process_data_treatment'] = self.nb_process_data_treatment
+        # Communication parameters to end correctly the measurement
+        parameters['measuring']        = True # True means measuring
+        parameters['safe_acquisition'] = False # True means the board has been closed properly
+        parameters['safe_treatment']  = [False, False] # True means the treatment is finished
+        parameters['measured_buffers'] = None
 
         return parameters
-
-
 
 
 
@@ -294,120 +298,112 @@ class ATS9360_NPT(Instrument):
     #########################################################################
 
 
-
-    def measure(self, processor):
-
-        # We create the Queue to be able to share data between processes
-        # Will contain measured data
-        queue_data = mp.Queue()
-
-        # We create variables to handle data treatment
-        queue_treatment = mp.Queue()
-        manager         = mp.Manager()
-        finish          = manager.list([False]*self.nb_process_data_treatment)
-
-        queue_plot = mp.Queue()
-
-        # We get the manager containing all experiment parameters
-        parameters = self._get_parameters()
-
-        processor.initialization()
-
-        start_data_treatment = time.clock()
-        # We create and launch data treatment processes
-        for index_processus in range(self.nb_process_data_treatment):
-            worker = mp.Process(target = processor.process,
-                                args   = (queue_data,
-                                          queue_plot,
-                                          queue_treatment,
-                                          parameters,
-                                          finish,
-                                          index_processus))
-            worker.start()
-
-        # We create the Process
-        # At this point the process is not start
-        worker_plot = mp.Process(target = plot_test,
-                                         args   = (queue_treatment,
-                                                   finish,
-                                                   parameters))
-        worker_plot.start()
-
-        # We create the Process
-        # At this point the process is not start
-        worker_acquire_data = mp.Process(target = sub_process.get_data,
-                                         args   = (queue_data,
-                                                   parameters))
-
-        # At this point the process is started
-        # Consequently, the measurement is launched.
-        worker_acquire_data.start()
-
-
-        # While data_treatment is True, we are treating data
-        # Surely, the data acquisition will finish before the data treatment
-        # but the worker will be stopped only when the data treatment will be
-        # finished.
-        while not all(finish):
-
-            pass
-
-
-        print parameters['message']
-        elasped_time = time.clock() - start_data_treatment
-        print('data treatment done in: %f sec' % elasped_time)
-
-        result = queue_treatment.get()
-
-        queue_treatment.close()
-        queue_data.close()
-        return result
-
-    #########################################################################
-    #
-    #
-    #                           Data treatment
-    #
-    #
-    #########################################################################
-
-    def do_set_nb_process_data_treatment(self, nb_process_data_treatment):
-        '''Set the number of process dedicated to data treatment
+    def measurement_initialization(self, processor):
+        """
+            Initialize the board and launch a measurement.
 
             Input:
-                - nb_process_data_treatment (int) :number of process dedicated
-                  to data treatment
-
+                - processor (obj instance): Instance of class coming from the
+                  file DataTreatment with the class DataTreatment as parent.
 
             Output:
                 - None
-            '''
+        """
 
-        if nb_process_data_treatment < 1:
+        # We create shared memory to share data between processes
+        queue_data_cha       = mp.Queue() # Contains measured data cha channel
+        queue_data_chb       = mp.Queue() # Contains measured data chb channel
 
-            raise ValueError('The number of process dedicated to data\
-                              treatment must be greater than 1')
-        else:
+        self.queue_treatment_cha = mp.Queue() # Contains treated data
+        self.queue_treatment_chb = mp.Queue() # Contains treated data
 
-            self.nb_process_data_treatment = nb_process_data_treatment
+        # Obtain all the parameters to set the board
+        self.parameters      = self._get_parameters()
+
+        # We create the data treatment process
+        self.worker_treat_data_cha = mp.Process(target = processor.treat_data,
+                                                args   = (queue_data_cha,
+                                                          self.queue_treatment_cha,
+                                                          self.parameters))
+
+        self.worker_treat_data_chb = mp.Process(target = processor.treat_data,
+                                                args   = (queue_data_chb,
+                                                          self.queue_treatment_chb,
+                                                          self.parameters))
+
+        # We create the data acquisition process
+        self.worker_acquire_data = mp.Process(target = data_acquisition.get_data,
+                                              args   = (queue_data_cha,
+                                                        queue_data_chb,
+                                                        self.parameters))
+
+        # At this point the process is started
+        # Consequently, the measurement is launched.
+        self.worker_acquire_data.start()
+        self.worker_treat_data_cha.start()
+        self.worker_treat_data_chb.start()
+
+        # The share memories are not used anymore in this process
+        queue_data_cha.close()
+        queue_data_chb.close()
+
+        self._aquired_buffer = 0.
 
 
-
-
-    def do_get_nb_process_data_treatment(self):
-        '''Get the number of process dedicated to data treatment
+    def measurement(self):
+        """
+            Return the data treated with the processor given in the
+            measurement_initialization method.
+            Data are return everytime a buffer is empty.
 
             Input:
-                - None.
-
+                - None
             Output:
-                - nb_process_data_treatmen
-        '''
+                - None
+        """
 
-        return self.nb_process_data_treatment
+        self._aquired_buffer += 1.
+        self.get_completed_acquisition()
+        return self.queue_treatment_cha.get(), self.queue_treatment_chb.get()
 
 
 
+    def measurement_close(self, transfert_info=False):
+        """
+            Finish properly the measurement
+            First inform the board that the measurement is finished and next
+            wait until the board as properly "close" the board.
+
+            Input:
+                - transfert_info (booleen): If True return the transfert rate
+                information
+            Output:
+                - transfert_info (str): If requested the transfert info
+        """
+
+        # We inform child process that the measurement is finished
+        self.parameters['measuring'] = False
+
+        # While the child process doesn't "close" properly the board and the
+        # data treatment is finished, we wait
+        while not self.parameters['safe_acquisition'] and not all(self.parameters['safe_treatment']):
+
+            pass
+
+        # Once the board is "close" properly, we close the FIFO memory and
+        # we close the child processes and the share memory
+        self.queue_treatment_cha.close()
+        self.queue_treatment_chb.close()
+        self.worker_acquire_data.terminate()
+        self.worker_treat_data_cha.terminate()
+        self.worker_treat_data_chb.terminate()
+
+
+        self._aquired_buffer = 0.
+        self.get_completed_acquisition()
+
+        if transfert_info:
+            return self.parameters['message']
 
 
 
@@ -418,6 +414,8 @@ class ATS9360_NPT(Instrument):
     #
     #
     #########################################################################
+
+
 
     def do_set_acquisition_time(self, acquisition_time):
         '''Set the acquisition time in [ns]
@@ -445,20 +443,16 @@ class ATS9360_NPT(Instrument):
 
         if acquisition_time > 256./self.samplerate*1e3:
 
-            acquired_samples = round(self.samplerate*acquisition_time*1e-3)
+            acquired_samples      = round(self.samplerate*acquisition_time*1e-3)
             self.acquired_samples = int(round(acquired_samples/128)*128)
-            acquisition_time_code = self.acquired_samples/self.samplerate/1e6
-            self.acquisition_time = acquisition_time_code*1e9
+            self.acquisition_time = self.acquired_samples/self.samplerate*1e3
 
             # To display the new value of acquired sample of get it
-            self.get_acquired_samples()
-
-            # return self.acquisition_time, self.acquired_samples
+            # self.get_acquired_samples()
         else:
 
             raise ValueError('The acquisition time must be longer than '\
                              +str(round(256./self.samplerate*1e3,2))+' ns.')
-
 
 
 
@@ -476,113 +470,170 @@ class ATS9360_NPT(Instrument):
 
 
 
+    # def do_get_acquired_samples(self):
+    #     '''Get the number of acquired samples in [S]
+    #
+    #         Input:
+    #             - None.
+    #
+    #         Output:
+    #             - acquired_samples (int): The number of acquired samples in [S]
+    #     '''
+    #
+    #     return self.acquired_samples
+    #
+    #
+    # def do_set_acquired_samples(self, sample):
+    #     '''Set the number of acquired samples in [S].
+    #         The minimum number if acquired sample is 256.
+    #         The number of acquired sample must a multiple of 128.
+    #         The number of acquired sample will be round the closest value
+    #         reachable.
+    #
+    #         Input:
+    #             - acquired_samples (int): The number of acquired samples in [S]
+    #
+    #         Output:
+    #             - None.
+    #     '''
+    #
+    #     if sample%128:
+    #         raise ValueError('The number of acquired sample must be a multiple of 128')
+    #     elif sample < 256:
+    #         raise ValueError('The number of acquired sample must be greater than 256')
+    #     else:
+    #         self.acquired_samples = sample
+    #
+    #         # To display the new value of acquisition time
+    #         self.set_acquisition_time(sample/self.samplerate*1e3)
 
 
-    def do_get_acquired_samples(self):
-        '''Get the number of acquired samples in [S]
+
+    # def do_set_buffers_per_acquisition(self, buffers_per_acquisition):
+    #     '''
+    #         Set the number of buffer during an acquisition
+    #
+    #         Input:
+    #             - buffers_per_acquisition (int): number of buffer during an
+    #              acquisition.
+    #
+    #         Output:
+    #             - None.
+    #     '''
+    #
+    #     self.buffers_per_acquisition = int(buffers_per_acquisition)
+
+
+
+    # def do_get_buffers_per_acquisition(self):
+    #     '''
+    #         Get the number of buffer during an acquisition
+    #
+    #         Input:
+    #             - None.
+    #
+    #         Output:
+    #             - buffers_per_acquisition (int): number of buffer during an
+    #              acquisition.
+    #     '''
+    #
+    #     return self.buffers_per_acquisition
+
+
+
+    # def do_set_records_per_buffer(self, records_per_buffer):
+    #     '''
+    #         Set the number of records per buffer
+    #
+    #         Input:
+    #             - records_per_buffer (int): number of records per buffer
+    #
+    #         Output:
+    #             - None.
+    #     '''
+    #
+    #     self.records_per_buffer = int(records_per_buffer)
+
+
+
+    # def do_get_records_per_buffer(self):
+    #     '''
+    #         Get the number of buffer during an acquisition
+    #
+    #         Input:
+    #             - None.
+    #
+    #         Output:
+    #             - records_per_buffer (int): number of records per buffer
+    #     '''
+    #
+    #     return self.records_per_buffer
+
+
+
+    # def do_set_nb_buffer_allocated(self, nb_buffer_allocated):
+    #     '''
+    #         Set the number of buffer allocated for an acquisition
+    #
+    #         Input:
+    #             - nb_buffer_allocated (int): number of buffer allocated for an
+    #              acquisition
+    #
+    #         Output:
+    #             - None.
+    #     '''
+    #
+    #     self.nb_buffer_allocated = int(nb_buffer_allocated)
+
+
+
+    # def do_get_nb_buffer_allocated(self):
+    #     '''
+    #         Get the number of buffer allocated for an acquisition
+    #
+    #         Input:
+    #             - None.
+    #
+    #         Output:
+    #             - nb_buffer_allocated (int): number of buffer allocated for an
+    #              acquisition
+    #     '''
+    #
+    #     return self.nb_buffer_allocated
+
+
+
+    def do_set_averaging(self, number_of_averaging):
+        '''
+            Set the number of averaging.
+            Should be a multiple of 100
+
+            Input:
+                - number_of_averaging (int): number of averaging
+
+            Output:
+                - None.
+        '''
+
+        if int(number_of_averaging)%100:
+            raise ValueError('The number of averaging should be a multiple of 100')
+
+        self.buffers_per_acquisition = int(number_of_averaging)/self.records_per_buffer
+
+
+
+    def do_get_averaging(self):
+        '''
+            Get the number of averaging
 
             Input:
                 - None.
 
             Output:
-                - acquired_samples (int): The number of acquired samples in [S]
+                - number_of_averaging (int): number of averaging
         '''
 
-        return self.acquired_samples
-
-
-
-
-    def do_set_buffers_per_acquisition(self, buffers_per_acquisition):
-        '''
-            Set the number of buffer during an acquisition
-
-            Input:
-                - buffers_per_acquisition (int): number of buffer during an
-                 acquisition.
-
-            Output:
-                - None.
-        '''
-
-        self.buffers_per_acquisition = int(buffers_per_acquisition)
-
-
-    def do_get_buffers_per_acquisition(self):
-        '''
-            Get the number of buffer during an acquisition
-
-            Input:
-                - None.
-
-            Output:
-                - buffers_per_acquisition (int): number of buffer during an
-                 acquisition.
-        '''
-
-        return self.buffers_per_acquisition
-
-
-
-
-    def do_set_records_per_buffer(self, records_per_buffer):
-        '''
-            Set the number of records per buffer
-
-            Input:
-                - records_per_buffer (int): number of records per buffer
-
-            Output:
-                - None.
-        '''
-
-        self.records_per_buffer = int(records_per_buffer)
-
-
-    def do_get_records_per_buffer(self):
-        '''
-            Get the number of buffer during an acquisition
-
-            Input:
-                - None.
-
-            Output:
-                - records_per_buffer (int): number of records per buffer
-        '''
-
-        return self.records_per_buffer
-
-
-    def do_set_nb_buffer_allocated(self, nb_buffer_allocated):
-        '''
-            Set the number of buffer allocated for an acquisition
-
-            Input:
-                - nb_buffer_allocated (int): number of buffer allocated for an
-                 acquisition
-
-            Output:
-                - None.
-        '''
-
-        self.nb_buffer_allocated = int(nb_buffer_allocated)
-
-
-    def do_get_nb_buffer_allocated(self):
-        '''
-            Get the number of buffer allocated for an acquisition
-
-            Input:
-                - None.
-
-            Output:
-                - nb_buffer_allocated (int): number of buffer allocated for an
-                 acquisition
-        '''
-
-        return self.nb_buffer_allocated
-
-
+        return self.buffers_per_acquisition*self.records_per_buffer
 
     #########################################################################
     #
@@ -591,6 +642,7 @@ class ATS9360_NPT(Instrument):
     #
     #
     #########################################################################
+
 
 
     def do_set_trigger_delay(self, trigger_delay):
@@ -608,6 +660,7 @@ class ATS9360_NPT(Instrument):
         self.trigger_delay = trigger_delay
 
 
+
     def do_get_trigger_delay(self):
         '''
             Get the trigger delay in [ns]
@@ -620,9 +673,6 @@ class ATS9360_NPT(Instrument):
         '''
 
         return self.trigger_delay
-
-
-
 
 
 
@@ -650,6 +700,7 @@ class ATS9360_NPT(Instrument):
                              +' V.')
 
 
+
     def do_get_trigger_level(self):
         '''
             Get the trigger level in [V]
@@ -662,9 +713,6 @@ class ATS9360_NPT(Instrument):
         '''
 
         return self.trigger_level
-
-
-
 
 
 
@@ -688,6 +736,7 @@ class ATS9360_NPT(Instrument):
             raise ValueError('The trigger range must contain the trigger level')
 
 
+
     def do_get_trigger_range(self):
         '''Get the input range of the trigger channel.
 
@@ -700,7 +749,6 @@ class ATS9360_NPT(Instrument):
         '''
 
         return self.trigger_range
-
 
 
 
@@ -717,6 +765,7 @@ class ATS9360_NPT(Instrument):
                 - None.
         '''
         self.trigger_slope = trigger_slope.lower()
+
 
 
     def do_get_trigger_slope(self):
@@ -736,12 +785,6 @@ class ATS9360_NPT(Instrument):
 
 
 
-
-
-
-
-
-
     #########################################################################
     #
     #
@@ -749,6 +792,7 @@ class ATS9360_NPT(Instrument):
     #
     #
     #########################################################################
+
 
 
     def do_set_clock_edge(self, clock_edge):
@@ -786,6 +830,7 @@ class ATS9360_NPT(Instrument):
         return self.clock_edge
 
 
+
     def do_set_samplerate(self, samplerate):
         '''Set the samplerate of the board.
 
@@ -817,15 +862,21 @@ class ATS9360_NPT(Instrument):
             if samplerate in self.allow_samplerates:
 
                 self.samplerate = float(samplerate)
+
+                # To display the new value of acquisition time
+                self.set_acquisition_time(self.acquired_samples/self.samplerate*1e3)
             else:
 
                 raise ValueError('Samplerate not allowed by the board')
 
         elif self.clock_source == 'external':
 
-            if samplerate > 300. and samplerate < 1800.:
+            if samplerate >= 300. and samplerate <= 1800.:
 
                 self.samplerate = float(samplerate)
+
+                # To display the new value of acquisition time
+                self.set_acquisition_time(self.acquired_samples/self.samplerate*1e3)
             else:
 
                 raise ValueError('Samplerate not allowed by the board')
@@ -833,6 +884,7 @@ class ATS9360_NPT(Instrument):
 
             raise ValueError('The clock source must be set to "internal"\
                               or "external".')
+
 
 
     def do_get_samplerate(self):
@@ -870,8 +922,6 @@ class ATS9360_NPT(Instrument):
 
 
 
-
-
     def do_get_clock_source(self):
         '''Get the clock source of the board.
 
@@ -883,3 +933,29 @@ class ATS9360_NPT(Instrument):
         '''
 
         return self.clock_source
+
+
+
+    #########################################################################
+    #
+    #
+    #                           The clock
+    #
+    #
+    #########################################################################
+
+
+
+    def do_get_completed_acquisition(self):
+        """
+            Return the percentage of completed acquisition.
+
+            Input:
+                - None
+
+            Output:
+                - percentage (float)
+        """
+
+
+        return round(self._aquired_buffer*100./self.buffers_per_acquisition, 2)
