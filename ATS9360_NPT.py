@@ -85,27 +85,6 @@ class ATS9360_NPT(Instrument):
             units       = 'ns'
             )
 
-        # self.add_parameter('acquired_samples',
-        #     type        = types.IntType,
-        #     flags       = Instrument.FLAG_GETSET,
-        #     units       = 'S'
-        #     )
-
-        # self.add_parameter('buffers_per_acquisition',
-        #     type        = types.IntType,
-        #     flags       = Instrument.FLAG_GETSET
-        #     )
-        #
-        # self.add_parameter('records_per_buffer',
-        #     type        = types.IntType,
-        #     flags       = Instrument.FLAG_GETSET
-        #     )
-        #
-        # self.add_parameter('nb_buffer_allocated',
-        #     type        = types.IntType,
-        #     flags       = Instrument.FLAG_GETSET
-        #     )
-
         self.add_parameter('averaging',
             type        = types.IntType,
             flags       = Instrument.FLAG_GETSET
@@ -203,10 +182,6 @@ class ATS9360_NPT(Instrument):
 
         self.get_acquisition_time()
         self.get_averaging()
-        # self.get_acquired_samples()
-        # self.get_buffers_per_acquisition()
-        # self.get_records_per_buffer()
-        # self.get_nb_buffer_allocated()
 
         self.get_completed_acquisition()
 
@@ -467,139 +442,6 @@ class ATS9360_NPT(Instrument):
         '''
 
         return self.acquisition_time
-
-
-
-    # def do_get_acquired_samples(self):
-    #     '''Get the number of acquired samples in [S]
-    #
-    #         Input:
-    #             - None.
-    #
-    #         Output:
-    #             - acquired_samples (int): The number of acquired samples in [S]
-    #     '''
-    #
-    #     return self.acquired_samples
-    #
-    #
-    # def do_set_acquired_samples(self, sample):
-    #     '''Set the number of acquired samples in [S].
-    #         The minimum number if acquired sample is 256.
-    #         The number of acquired sample must a multiple of 128.
-    #         The number of acquired sample will be round the closest value
-    #         reachable.
-    #
-    #         Input:
-    #             - acquired_samples (int): The number of acquired samples in [S]
-    #
-    #         Output:
-    #             - None.
-    #     '''
-    #
-    #     if sample%128:
-    #         raise ValueError('The number of acquired sample must be a multiple of 128')
-    #     elif sample < 256:
-    #         raise ValueError('The number of acquired sample must be greater than 256')
-    #     else:
-    #         self.acquired_samples = sample
-    #
-    #         # To display the new value of acquisition time
-    #         self.set_acquisition_time(sample/self.samplerate*1e3)
-
-
-
-    # def do_set_buffers_per_acquisition(self, buffers_per_acquisition):
-    #     '''
-    #         Set the number of buffer during an acquisition
-    #
-    #         Input:
-    #             - buffers_per_acquisition (int): number of buffer during an
-    #              acquisition.
-    #
-    #         Output:
-    #             - None.
-    #     '''
-    #
-    #     self.buffers_per_acquisition = int(buffers_per_acquisition)
-
-
-
-    # def do_get_buffers_per_acquisition(self):
-    #     '''
-    #         Get the number of buffer during an acquisition
-    #
-    #         Input:
-    #             - None.
-    #
-    #         Output:
-    #             - buffers_per_acquisition (int): number of buffer during an
-    #              acquisition.
-    #     '''
-    #
-    #     return self.buffers_per_acquisition
-
-
-
-    # def do_set_records_per_buffer(self, records_per_buffer):
-    #     '''
-    #         Set the number of records per buffer
-    #
-    #         Input:
-    #             - records_per_buffer (int): number of records per buffer
-    #
-    #         Output:
-    #             - None.
-    #     '''
-    #
-    #     self.records_per_buffer = int(records_per_buffer)
-
-
-
-    # def do_get_records_per_buffer(self):
-    #     '''
-    #         Get the number of buffer during an acquisition
-    #
-    #         Input:
-    #             - None.
-    #
-    #         Output:
-    #             - records_per_buffer (int): number of records per buffer
-    #     '''
-    #
-    #     return self.records_per_buffer
-
-
-
-    # def do_set_nb_buffer_allocated(self, nb_buffer_allocated):
-    #     '''
-    #         Set the number of buffer allocated for an acquisition
-    #
-    #         Input:
-    #             - nb_buffer_allocated (int): number of buffer allocated for an
-    #              acquisition
-    #
-    #         Output:
-    #             - None.
-    #     '''
-    #
-    #     self.nb_buffer_allocated = int(nb_buffer_allocated)
-
-
-
-    # def do_get_nb_buffer_allocated(self):
-    #     '''
-    #         Get the number of buffer allocated for an acquisition
-    #
-    #         Input:
-    #             - None.
-    #
-    #         Output:
-    #             - nb_buffer_allocated (int): number of buffer allocated for an
-    #              acquisition
-    #     '''
-    #
-    #     return self.nb_buffer_allocated
 
 
 
