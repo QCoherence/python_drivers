@@ -107,7 +107,7 @@ class DataAcquisition(object):
         trigger_slope = parameters['trigger_slope']
         trigger_range = parameters['trigger_range']
         trigger_level = parameters['trigger_level']
-        trigger_delay = parameters['trigger_delay']*1e9 # To get it in second
+        trigger_delay = parameters['trigger_delay']*1e-9 # To get it in second
 
         samplerate    = parameters['samplerate']*1e6 # To get it in S/s
 
