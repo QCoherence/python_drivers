@@ -1312,7 +1312,8 @@ class Tabor_WX1284C(Instrument):
         """
         This method loads a sequence with number seq_id into the AWG.
         Inputs:
-            buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
+            buffer: 2D numpy.array of the sequence formated in the following way
+                    [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
             seq_id (int): the number of the sequence to be loaded. Value between 1 and 1 000.
         Output:
             None
