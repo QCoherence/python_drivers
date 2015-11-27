@@ -698,7 +698,7 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Setting the trigger level to %s.' % trig_val)
         self._visainstrument.write('TRIG:LEV %s' % trig_val)
 
-        if self._visainstrument.query('TRIG:LEV ?') != trig_val:
+        if float(self._visainstrument.query('TRIG:LEV ?')) != trig_val:
             logging.info('The trigger level wasn\'t set properly')
             raise ValueError('The trigger level wasn\'t set properly to set_trigger_level. Valid value are between -5 and 5.')
 
