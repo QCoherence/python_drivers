@@ -262,12 +262,6 @@ class DataAcquisition(object):
 
             queue_data_cha.put(np.copy(buff.buffer[0::2]))
             queue_data_chb.put(np.copy(buff.buffer[1::2]))
-            # a = buff.buffer[0::2] >> 4
-            # b = buff.buffer[1::2] >> 4
-            # queue_data_cha.put_nowait(400e-3*(a - 2047.5)/2047.5)
-            # queue_data_chb.put_nowait(400e-3*(b - 2047.5)/2047.5)
-
-
 
             # Add the buffer to the end of the list of available buffers.
             board.postAsyncBuffer(buff.addr, buff.size_bytes)
