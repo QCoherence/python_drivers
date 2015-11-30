@@ -90,6 +90,11 @@ class ATS9360_NPT(Instrument):
             flags       = Instrument.FLAG_GETSET
             )
 
+        self.add_parameter('nb_sequence',
+            type        = types.IntType,
+            flags       = Instrument.FLAG_GETSET
+            )
+
         self.add_parameter('completed_acquisition',
             type        = types.FloatType,
             flags       = Instrument.FLAG_GET,
@@ -153,13 +158,21 @@ class ATS9360_NPT(Instrument):
         self.trigger_delay = 0. # In [ns]
 
         # Attributes of the acquisition
-        self.acquired_samples        = 128*80 # In S. Must be integer
-        self.acquisition_time        = self.acquired_samples/1.8 # In ns, float
-        self.records_per_buffer      = 100 # Must be integer
-        self.nb_buffer_allocated     = 4 # Must be integer
-        self.buffers_per_acquisition = 200 # Must be integer
+        self.acquired_samples           = 128*80 # In S. Must be integer
+        self.acquisition_time           = self.acquired_samples/1.8 # In ns, float
+        self.default_records_per_buffer = 100 # Must be integer and even
+        # The current records per buffer is equal to the default one at the
+        # initialization of the board.
+        self.records_per_buffer         = self.default_records_per_buffer
+        self.nb_buffer_allocated        = 4 # Must be integer
+        self.buffers_per_acquisition    = 200 # Must be integer
+        self.nb_sequence                = 2 # Must be integer and even
 
-        self._aquired_buffer = 0.
+        # Keep trace of the number of sequence acquired by the board.
+        # If a measurement is well executed, this number becomes equal to the
+        # number of buffers per acquisition times the number of averaging
+        self._acquired_sequences = 0.
+
 
         # For the display, we get all parameters at the end of the
         # initialization
@@ -168,6 +181,10 @@ class ATS9360_NPT(Instrument):
 
 
     def get_all(self):
+        """
+            Get all parameters of the board.
+            Normally executed at the initialization of the instrument
+        """
 
         logging.info(__name__ + ' : get all')
 
@@ -182,6 +199,7 @@ class ATS9360_NPT(Instrument):
 
         self.get_acquisition_time()
         self.get_averaging()
+        self.get_nb_sequence()
 
         self.get_completed_acquisition()
 
@@ -194,6 +212,7 @@ class ATS9360_NPT(Instrument):
     #
     #
     #########################################################################
+
 
 
     def _get_bytes_per_buffer(self):
@@ -246,6 +265,7 @@ class ATS9360_NPT(Instrument):
         parameters['records_per_buffer']      = self.records_per_buffer
         parameters['nb_buffer_allocated']     = self.nb_buffer_allocated
         parameters['buffers_per_acquisition'] = self.buffers_per_acquisition
+        parameters['nb_sequence']             = self.nb_sequence
 
         # Correspondence between user parameters and board command
         parameters['allow_samplerates']    = self.allow_samplerates
@@ -271,6 +291,7 @@ class ATS9360_NPT(Instrument):
     #
     #
     #########################################################################
+
 
 
     def measurement_initialization(self, processor):
@@ -322,14 +343,16 @@ class ATS9360_NPT(Instrument):
         queue_data_cha.close()
         queue_data_chb.close()
 
-        self._aquired_buffer = 0.
+        # Initialize the number of acquired sequence to zero
+        self._acquired_sequences = 0.
+
 
 
     def measurement(self):
         """
             Return the data treated with the processor given in the
             measurement_initialization method.
-            Data are return everytime a buffer is empty.
+            Data are return everytime a sequence is measured.
 
             Input:
                 - None
@@ -337,8 +360,14 @@ class ATS9360_NPT(Instrument):
                 - None
         """
 
-        self._aquired_buffer += 1.
+        # Each times the treatment buffer memory is loaded means a  new
+        # averaging has been trated
+        self._acquired_sequences += 1.
+
+        # We update the percentage of the measurement
         self.get_completed_acquisition()
+
+        # We return the data of the buffer memory
         return self.queue_treatment_cha.get(), self.queue_treatment_chb.get()
 
 
@@ -374,7 +403,7 @@ class ATS9360_NPT(Instrument):
         self.worker_treat_data_chb.terminate()
 
 
-        self._aquired_buffer = 0.
+        self._acquired_sequences = 0.
         self.get_completed_acquisition()
 
         if transfert_info:
@@ -445,22 +474,44 @@ class ATS9360_NPT(Instrument):
 
 
 
-    def do_set_averaging(self, number_of_averaging):
+    def do_set_averaging(self, nb_averaging, output=False):
         '''
             Set the number of averaging.
-            Should be a multiple of 100
+            It should be even.
+            When nb_averaging x nb_sequence >100, nb_averaging must be a
+            multiple of 100
 
             Input:
-                - number_of_averaging (int): number of averaging
+                - nb_averaging (int): number of averaging
+                - output (booleen): To obtain information about the card
+                    parameters
 
             Output:
                 - None.
         '''
 
-        if int(number_of_averaging)%100:
-            raise ValueError('The number of averaging should be a multiple of 100')
+        if nb_averaging%2:
+            raise ValueError('The number of averaging should be even')
+        if nb_averaging*self.nb_sequence > self.default_records_per_buffer:
+            if nb_averaging%self.default_records_per_buffer:
+                raise ValueError('When nb_averaging x nb_sequence >100, nb_averaging must be a multiple of 100')
 
-        self.buffers_per_acquisition = int(number_of_averaging)/self.records_per_buffer
+        if nb_averaging*self.nb_sequence < self.default_records_per_buffer:
+            self.buffers_per_acquisition = 1
+            self.records_per_buffer      = int(nb_averaging*self.nb_sequence)
+        else:
+            self.records_per_buffer      = int(self.default_records_per_buffer)
+            self.buffers_per_acquisition = int(np.ceil(float(nb_averaging*self.nb_sequence)\
+                                                       /self.default_records_per_buffer))
+
+        if output:
+            m  = 'buffer per acquisition:', self.buffers_per_acquisition
+            m += 'records per buffer:', self.records_per_buffer
+            m += 'number of sequence:', self.nb_sequence
+            m += 'averaging:', self.get_averaging()
+            m += 'tot:', self.buffers_per_acquisition*self.records_per_buffer
+
+            return m
 
 
 
@@ -475,7 +526,65 @@ class ATS9360_NPT(Instrument):
                 - number_of_averaging (int): number of averaging
         '''
 
-        return self.buffers_per_acquisition*self.records_per_buffer
+        return self.buffers_per_acquisition*self.records_per_buffer/self.nb_sequence
+
+
+
+    def do_set_nb_sequence(self, nb_sequence, output=False):
+        '''
+            Set the number of nb_sequence.
+            It should be an even number.
+
+            Input:
+                - nb_sequence (int): number of sequence
+                - output (booleen): To obtain information about the card
+                    parameters
+
+            Output:
+                - None.
+        '''
+
+        if nb_sequence%2:
+            raise ValueError('The number of sequence should be even')
+
+        # Number of averaging
+        nb_averaging = self.buffers_per_acquisition*self.records_per_buffer\
+                       /self.nb_sequence
+
+        if nb_sequence*nb_averaging < self.default_records_per_buffer:
+            self.buffers_per_acquisition = 1
+            self.records_per_buffer      = int(nb_averaging*nb_sequence)
+        else:
+            self.records_per_buffer      = int(self.default_records_per_buffer)
+            self.buffers_per_acquisition = int(nb_averaging*nb_sequence/self.records_per_buffer)
+
+        self.nb_sequence = nb_sequence
+
+        if output:
+            m  = 'buffer per acquisition:', self.buffers_per_acquisition
+            m += 'records per buffer:', self.records_per_buffer
+            m += 'number of sequence:', self.nb_sequence
+            m += 'averaging:', self.get_averaging()
+            m += 'tot:', self.buffers_per_acquisition*self.records_per_buffer
+
+            return m
+
+
+
+    def do_get_nb_sequence(self):
+        '''
+            Get the number of sequence
+
+            Input:
+                - None.
+
+            Output:
+                - number_of_sequence (int): number of sequence
+        '''
+
+        return self.nb_sequence
+
+
 
     #########################################################################
     #
@@ -800,4 +909,4 @@ class ATS9360_NPT(Instrument):
         """
 
 
-        return round(self._aquired_buffer*100./self.buffers_per_acquisition, 2)
+        return round(self._acquired_sequences*100./self.get_averaging(), 2)
