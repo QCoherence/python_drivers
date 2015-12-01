@@ -51,31 +51,26 @@ class Agilent_E8257D_40GHz(Instrument):
         except:
             raise SystemExit
 
-        self.add_parameter('power',
-            flags=Instrument.FLAG_GETSET, units='dBm', minval=-135, maxval=25, type=types.FloatType)
-        self.add_parameter('phase',
-            flags=Instrument.FLAG_GETSET, units='rad', minval=-numpy.pi, maxval=numpy.pi, type=types.FloatType)
-        self.add_parameter('frequency',
-            flags=Instrument.FLAG_GETSET, units='Hz', minval=1e5, maxval=40e9, type=types.FloatType)
-        self.add_parameter('RF_status',
-            flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-        self.add_parameter('pulse_status',
-            flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-        self.add_parameter('pulse_type',
-            flags=Instrument.FLAG_GETSET, option_list=['square', 'frun', 'trigered', 'doublet', 'gated'], type=types.StringType)
-        self.add_parameter('pulse_period',
-            flags=Instrument.FLAG_GETSET, units='s', type=types.FloatType)
-        self.add_parameter('pulse_width',
-            flags=Instrument.FLAG_GETSET, units='s', type=types.FloatType)
+        self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval=-135, maxval=25, type=types.FloatType)
+        self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-numpy.pi, maxval=numpy.pi, type=types.FloatType)
+        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=1e5, maxval=40e9, type=types.FloatType)
+        self.add_parameter('RF_status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
+        self.add_parameter('pulse_status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
+        self.add_parameter('pulse_type', flags=Instrument.FLAG_GETSET, option_list=['square', 'frun', 'trigered', 'doublet', 'gated'], type=types.StringType)
+        self.add_parameter('pulse_period', flags=Instrument.FLAG_GETSET, units='s', type=types.FloatType)
+        self.add_parameter('pulse_width', flags=Instrument.FLAG_GETSET, units='s', type=types.FloatType)
         self.add_parameter('freqsweep', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
+		
+		
         self.add_function('reset')
         self.add_function ('get_all')
 
 
         if (reset):
+		
             self.reset()
-        else:
-            self.get_all()
+        
+        self.get_all()
 
     def reset(self):
         '''
