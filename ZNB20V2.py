@@ -36,7 +36,7 @@ class ZNB20V2(Instrument):
     def __init__(self, name, address, reset = False):
         '''
         Initializes the ZNB20
-        
+
         Input:
             name (string)    : name of the instrument
             address (string) : TCPIP/GPIB address
@@ -46,24 +46,26 @@ class ZNB20V2(Instrument):
             None
         '''
         logging.debug(__name__ + ' : Initializing instrument')
-        
+
         Instrument.__init__(self, name, tags=['physical'])
-        
-        
-        self._address = address    
+
+
+        self._address = address
 
         try:
             self._visainstrument =visa.instrument(self._address)
         except:
             raise SystemExit
-        self._visainstrument.term_chars = '\n'			
-			
-			
+        self._visainstrument.term_chars = '\n'
+
+
         self.add_parameter('frequencyspan', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
         self.add_parameter('centerfrequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
         self.add_parameter('startfrequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
         self.add_parameter('stopfrequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', maxval=30.0, type=types.FloatType)
+        self.add_parameter('startpower', flags=Instrument.FLAG_GETSET, units='dBm', maxval=30.0, type=types.FloatType)
+        self.add_parameter('stoppower', flags=Instrument.FLAG_GETSET, units='dBm', maxval=30.0, type=types.FloatType)
         self.add_parameter('averages', flags=Instrument.FLAG_GETSET, units='', maxval=100000, type=types.FloatType)
         self.add_parameter('averagestatus', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('points', flags=Instrument.FLAG_GETSET, units='', minval=1, maxval=100000, type=types.FloatType)
@@ -71,15 +73,15 @@ class ZNB20V2(Instrument):
         self.add_parameter('measBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=0.1, maxval=500e3, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('cwfrequency', flags=Instrument.FLAG_GETSET, units='GHz', minval=1e-4, maxval=20, type=types.FloatType)
-        
+
         self.add_function('get_all')
         self.add_function('reset')
         self.add_function('create_trace')
-        
+
         if reset :
-            
+
             self.reset()
-        
+
         #self.get_all()
 
 ###################################################################
@@ -118,13 +120,15 @@ class ZNB20V2(Instrument):
         self.get_startfrequency()
         self.get_stopfrequency()
         self.get_power()
+        self.get_startpower()
+        self.get_stoppower()
         self.get_averages()
         self.get_averagestatus()
         self.get_points()
         self.get_sweeps()
         self.get_measBW()
         self.get_status()
-        self.get_cwfrequency()	
+        self.get_cwfrequency()
 
     def create_trace(self,trace,Sparam):
         '''
@@ -211,8 +215,8 @@ class ZNB20V2(Instrument):
         '''
         logging.info(__name__ + ' : start to measure and wait till it is finished')
         self._visainstrument.write('initiate:cont off')
-        #Set the standard event register (ESR) to zero		
-        self._visainstrument.write('*CLS')		
+        #Set the standard event register (ESR) to zero
+        self._visainstrument.write('*CLS')
         #self._visainstrument.write('init:imm')
 		#self._visainstrument.write('*WAI')
         #self._visainstrument.write('*OPC')
@@ -265,12 +269,12 @@ class ZNB20V2(Instrument):
 			dstring=self._visainstrument.ask('calculate:Data? Sdata')
 			dstringclean=dstring.split(';')[0]
 			real1,im1= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			
+
 			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
 			dstring=self._visainstrument.ask('calculate:Data? Sdata')
 			dstringclean=dstring.split(';')[0]
 			real2,im2= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			
+
 			return real1+im1*1j,real2+im2*1j
 
 
@@ -296,17 +300,17 @@ class ZNB20V2(Instrument):
 			dstring=self._visainstrument.ask('calculate:Data? Sdata')
 			dstringclean=dstring.split(';')[0]
 			real1,im1= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			
+
 			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
 			dstring=self._visainstrument.ask('calculate:Data? Sdata')
 			dstringclean=dstring.split(';')[0]
 			real2,im2= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			
+
 			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace3))
 			dstring=self._visainstrument.ask('calculate:Data? Sdata')
 			dstringclean=dstring.split(';')[0]
 			real3,im3= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			
+
 			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace4))
 			dstring=self._visainstrument.ask('calculate:Data? Sdata')
 			dstringclean=dstring.split(';')[0]
@@ -315,13 +319,13 @@ class ZNB20V2(Instrument):
 			#estring=self._visainstrument.ask('system:error:all?')
 			#print estring
 
-			return real1+im1*1j,real2+im2*1j,real3+im3*1j,real4+im4*1j			        	
+			return real1+im1*1j,real2+im2*1j,real3+im3*1j,real4+im4*1j
 
 
     def averageclear(self):
         '''
         Starts a new average cycle
-		
+
 
         Input:
             None
@@ -335,7 +339,7 @@ class ZNB20V2(Instrument):
     def set_trigger(self, trigger='IMM'):
         '''
     	Define the source of the trigger: IMMediate (free run measurement or untriggered), EXTernal, MANual or MULTiple
-        
+
         Input:
             trigger (string): IMM, EXT, MAN or MULT
         Output:
@@ -349,14 +353,14 @@ class ZNB20V2(Instrument):
         elif trigger.upper() in ('MAN'):
             self._visainstrument.write('TRIG:SOUR MAN')
         elif trigger.upper() in ('MULT'):
-            self._visainstrument.write('TRIG:SOUR MULT')			
+            self._visainstrument.write('TRIG:SOUR MULT')
         else:
             raise ValueError('set_trigger(): can only set IMM, EXT, MAN or MULT')
 
     def set_trigger_link(self, link='POIN'):
         '''
         Define the link of the trigger: SWEep (trigger event starts an entire sweep), SEGMent (trigger event starts a sweep segment), POINt (trigger event starts measurement at the next sweep point) or PPOint (trigger event starts the next partial measurement at the current or at the next sweep point).
-        
+
         Input:
             lin (string): SWE, SEGM, POIN or PPOIN
         Output:
@@ -370,14 +374,14 @@ class ZNB20V2(Instrument):
         elif link.upper() in ('POIN'):
             self._visainstrument.write('TRIG:LINK'+str('POIN'))
         elif link.upper() in ('PPOIN'):
-            self._visainstrument.write('TRIG:LINK'+str('PPOIN'))			
+            self._visainstrument.write('TRIG:LINK'+str('PPOIN'))
         else:
-            raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPOIN')		
-	
+            raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPOIN')
+
     def set_sweeptype(self, sweeptype='LIN'):
         '''
     	Define the type of the sweep: LINear | LOGarithmic | POWer | CW | POINt | SEGMent
-        
+
         Input:
             sweeptype (string): LIN, LOG, POW, CW, POIN or SEG
         Output:
@@ -395,11 +399,11 @@ class ZNB20V2(Instrument):
         elif sweeptype.upper() in ('POIN'):
             self._visainstrument.write('SWE:TYPE POIN')
         elif sweeptype.upper() in ('SEG'):
-            self._visainstrument.write('SWE:TYPE SEG')			
+            self._visainstrument.write('SWE:TYPE SEG')
         else:
-            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')	
+            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
 
-		
+
 #########################################################
 #
 #                  Write and Read from VISA
@@ -429,7 +433,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:center '+str(centerfrequency))
 
@@ -444,7 +448,7 @@ class ZNB20V2(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
         return self._visainstrument.ask('frequency:center?')
 
@@ -458,7 +462,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:span '+str(stopfrequency))
 
@@ -473,7 +477,7 @@ class ZNB20V2(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
         return self._visainstrument.ask('frequency:span?')
 
@@ -488,7 +492,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:start '+str(startfrequency))
 
@@ -503,7 +507,7 @@ class ZNB20V2(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
         return self._visainstrument.ask('frequency:start?')
 
@@ -517,7 +521,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the frequency of the instrument')
         self._visainstrument.write('frequency:stop '+str(stopfrequency))
 
@@ -532,10 +536,10 @@ class ZNB20V2(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the frequency of the instrument')
         return self._visainstrument.ask('frequency:stop?')
-  
+
     def do_set_cwfrequency(self, cwfrequency=1.):
         '''
             Set the CW frequency of the instrument
@@ -546,9 +550,9 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the CW frequency of the instrument')
-        self._visainstrument.write('SOUR:FREQ:CW '+str(cwfrequency)+ 'GHz')	
+        self._visainstrument.write('SOUR:FREQ:CW '+str(cwfrequency)+ 'GHz')
 
     def do_get_cwfrequency(self):
         '''
@@ -560,17 +564,17 @@ class ZNB20V2(Instrument):
             Output:
                 frequency (float): frequency at which the instrument has been tuned [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the CW frequency of the instrument')
         return self._visainstrument.ask('SOUR:FREQ:CW?')
-		
+
 #########################################################
 #
 #                Power
 #
 #########################################################
 
-    def do_set_power(self, power=0):
+    def do_set_power(self, power=-40.):
         '''
             Set the power of the instrument
 
@@ -581,7 +585,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the instrument')
         self._visainstrument.write('source:power '+str(power))
 
@@ -597,9 +601,69 @@ class ZNB20V2(Instrument):
 
                 power (float): power at which the instrument has been tuned [dBm]
         '''
-        
+
         logging.info(__name__+' : Get the power of the instrument')
         return self._visainstrument.ask('source:power?')
+
+
+    def do_set_startpower(self, startpower=-40.):
+        '''
+            Set the start power of the instrument
+
+            Input:
+                power (float): start power at which the instrument will be tuned [dBm]
+
+            Output:
+                None
+        '''
+
+        logging.info(__name__+' : Set the start power of the instrument')
+        self._visainstrument.write('SOUR:POW:STAR '+str(startpower))
+
+
+    def do_get_startpower(self):
+        '''
+            Get the start power of the instrument
+
+            Input:
+                None
+
+            Output:
+                power (float): start power at which the instrument has been tuned [dBm]
+        '''
+
+        logging.info(__name__+' : Get the start power of the instrument')
+        return self._visainstrument.ask('SOUR:POW:STAR?')
+
+    def do_set_stoppower(self, stoppower=-40.):
+        '''
+            Set the stop power of the instrument
+
+            Input:
+                power (float): stop power at which the instrument will be tuned [dBm]
+
+            Output:
+                None
+        '''
+
+        logging.info(__name__+' : Set the stop power of the instrument')
+        self._visainstrument.write('SOUR:POW:STOP '+str(stoppower))
+
+
+    def do_get_stoppower(self):
+        '''
+            Get the stop power of the instrument
+
+            Input:
+                None
+
+            Output:
+                power (float): stop power at which the instrument has been tuned [Hz]
+        '''
+
+        logging.info(__name__+' : Get the stop power of the instrument')
+        return self._visainstrument.ask('SOUR:POW:STOP?')
+
 
 #########################################################
 #
@@ -618,7 +682,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the averages of the instrument')
         self._visainstrument.write('average:count '+str(averages))
 
@@ -633,9 +697,9 @@ class ZNB20V2(Instrument):
 
             Output:
 
-                phase (float): averages of the instrument 
+                phase (float): averages of the instrument
         '''
-        
+
         logging.info(__name__+' : Get the averages of the instrument')
         return self._visainstrument.ask('average:count?')
 
@@ -696,7 +760,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the measurement bandwidth of the instrument')
         self._visainstrument.write('sens:band '+str(measBW))
 
@@ -713,7 +777,7 @@ class ZNB20V2(Instrument):
 
                 BW (float): measurement bandwidth [Hz]
         '''
-        
+
         logging.info(__name__+' : Get the BW of the instrument')
         return self._visainstrument.ask('sens:band?')
 
@@ -735,7 +799,7 @@ class ZNB20V2(Instrument):
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the instrument')
         self._visainstrument.write('sens:sweep:points '+str(points))
 
@@ -751,7 +815,7 @@ class ZNB20V2(Instrument):
 
                 BW (float): power at which the instrument has been tuned [dBm]
         '''
-        
+
         logging.info(__name__+' : Get the BW of the instrument')
         return self._visainstrument.ask('sens:sweep:points?')
 
@@ -767,12 +831,12 @@ class ZNB20V2(Instrument):
 
 
             Input:
-                power (float): sweeps of the instrument will be tuned 
+                power (float): sweeps of the instrument will be tuned
 
             Output:
                 None
         '''
-        
+
         logging.info(__name__+' : Set the power of the instrument')
         self._visainstrument.write('initiate:cont Off ')
         self._visainstrument.write('sens:sweep:count '+str(sweeps))
@@ -787,9 +851,9 @@ class ZNB20V2(Instrument):
 
             Output:
 
-                BW (float):sweeps at which the instrument 
+                BW (float):sweeps at which the instrument
         '''
-        
+
         logging.info(__name__+' : Get the sweeps of the instrument')
         return self._visainstrument.ask('sens:sweep:count?')
 
@@ -836,6 +900,3 @@ class ZNB20V2(Instrument):
         else:
             raise ValueError('set_status(): can only set on or off')
         self._visainstrument.write('output %s' % status)
-
-
-
