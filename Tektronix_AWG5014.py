@@ -58,10 +58,10 @@ class Tektronix_AWG5014(Instrument):
         '''
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
-
+        rm = visa.ResourceManager
 
         self._address = address
-        self._visainstrument = visa.instrument(self._address)
+        self._visainstrument = rm.open_resource(self._address)
         self._values = {}
         self._values['files'] = {}
         self._clock = clock
@@ -248,7 +248,7 @@ class Tektronix_AWG5014(Instrument):
             state (int) : on (1) or off (0)
         '''
         logging.debug(__name__ + ' : Get channel output state')
-        return self._visainstrument.ask('OUTP%s:STAT?' % channel)
+        return self._visainstrument.query('OUTP%s:STAT?' % channel)
 
     def do_set_waveform(self, waveform, channel):
         '''
@@ -277,7 +277,7 @@ class Tektronix_AWG5014(Instrument):
             waveform (str) : the waveform filename as loaded in waveform list
         '''
         logging.debug(__name__ + ' : Get the output waveform for channel %s' % channel)
-        return self._visainstrument.ask('SOUR%s:WAV?' % channel)
+        return self._visainstrument.query('SOUR%s:WAV?' % channel)
 
     def do_get_wlist(self):
         '''
@@ -288,10 +288,10 @@ class Tektronix_AWG5014(Instrument):
         Output:
             wlist (array) : the waveform list in an array.
         '''
-        size = int(self._visainstrument.ask('WLIST:SIZE?'))
+        size = int(self._visainstrument.query('WLIST:SIZE?'))
         wlist = []
         for i in range(0, size):
-            wname = self._visainstrument.ask('WLIST:NAME? %f' % i)
+            wname = self._visainstrument.query('WLIST:NAME? %f' % i)
             wname = wname.replace('"','')
             wlist.append(wname)
         return wlist
@@ -437,7 +437,7 @@ class Tektronix_AWG5014(Instrument):
             None
         '''
         self.set_runmode('TRIG')
-    
+
     def set_trigger_mode_off(self):
         '''
         Dummy function'
@@ -450,7 +450,7 @@ class Tektronix_AWG5014(Instrument):
         '''
         # self.set_runmode('TRIG')
 
-        
+
     def set_runmode_cont(self):
         '''
         Sets the trigger mode to 'Cont'
@@ -501,7 +501,7 @@ class Tektronix_AWG5014(Instrument):
             mode (string) : 'Trig' or 'Cont' depending on the mode
         '''
         logging.debug(__name__  + ' : Get trigger mode from instrument')
-        return self._visainstrument.ask('AWGC:RMOD?')
+        return self._visainstrument.query('AWGC:RMOD?')
 
     def do_set_trigger_mode(self, mod):
         '''
@@ -531,7 +531,7 @@ class Tektronix_AWG5014(Instrument):
             impedance (??) : 1e3 or 50 depending on the mode
         '''
         logging.debug(__name__  + ' : Get trigger impedance from instrument')
-        return self._visainstrument.ask('TRIG:IMP?')
+        return self._visainstrument.query('TRIG:IMP?')
 
     def do_set_trigger_impedance(self, mod):
         '''
@@ -561,7 +561,7 @@ class Tektronix_AWG5014(Instrument):
             None
         '''
         logging.debug(__name__  + ' : Get trigger level from instrument')
-        return float(self._visainstrument.ask('TRIG:LEV?'))
+        return float(self._visainstrument.query('TRIG:LEV?'))
 
     def do_set_trigger_level(self, level):
         '''
@@ -661,7 +661,7 @@ class Tektronix_AWG5014(Instrument):
         else:
             logging.debug(__name__  + ' : File does not exist in memory, \
             reading from instrument')
-            lijst = self._visainstrument.ask('MMEM:CAT? "MAIN"')
+            lijst = self._visainstrument.query('MMEM:CAT? "MAIN"')
             bool = False
             bestand=""
             for i in range(len(lijst)):
@@ -674,7 +674,7 @@ class Tektronix_AWG5014(Instrument):
                 elif bool:
                     bestand = bestand + lijst[i]
         if exists:
-            data = self._visainstrument.ask('MMEM:DATA? "%s"' % name)
+            data = self._visainstrument.query('MMEM:DATA? "%s"' % name)
             logging.debug(__name__  + ' : File exists on instrument, loading \
             into local memory')
             # string alsvolgt opgebouwd: '#' <lenlen1> <len> 'MAGIC 1000\r\n' '#' <len waveform> 'CLOCK ' <clockvalue>
@@ -732,7 +732,7 @@ class Tektronix_AWG5014(Instrument):
         '''
         logging.debug(__name__ + ' : Get amplitude of channel %s from instrument'
             % channel)
-        return float(self._visainstrument.ask('SOUR%s:VOLT:LEV:IMM:AMPL?' % channel))
+        return float(self._visainstrument.query('SOUR%s:VOLT:LEV:IMM:AMPL?' % channel))
 
     def do_set_amplitude(self, amp, channel):
         '''
@@ -760,7 +760,7 @@ class Tektronix_AWG5014(Instrument):
             offset (float) : offset of designated channel in Volts
         '''
         logging.debug(__name__ + ' : Get offset of channel %s' % channel)
-        return float(self._visainstrument.ask('SOUR%s:VOLT:LEV:IMM:OFFS?' % channel))
+        return float(self._visainstrument.query('SOUR%s:VOLT:LEV:IMM:OFFS?' % channel))
 
     def do_set_offset(self, offset, channel):
         '''
@@ -787,7 +787,7 @@ class Tektronix_AWG5014(Instrument):
             low (float) : low level in Volts
         '''
         logging.debug(__name__ + ' : Get lower bound of marker1 of channel %s' % channel)
-        return float(self._visainstrument.ask('SOUR%s:MARK1:VOLT:LEV:IMM:LOW?' % channel))
+        return float(self._visainstrument.query('SOUR%s:MARK1:VOLT:LEV:IMM:LOW?' % channel))
 
     def do_set_marker1_low(self, low, channel):
         '''
@@ -815,7 +815,7 @@ class Tektronix_AWG5014(Instrument):
             high (float) : high level in Volts
         '''
         logging.debug(__name__ + ' : Get upper bound of marker1 of channel %s' % channel)
-        return float(self._visainstrument.ask('SOUR%s:MARK1:VOLT:LEV:IMM:HIGH?' % channel))
+        return float(self._visainstrument.query('SOUR%s:MARK1:VOLT:LEV:IMM:HIGH?' % channel))
 
     def do_set_marker1_high(self, high, channel):
         '''
@@ -843,7 +843,7 @@ class Tektronix_AWG5014(Instrument):
             low (float) : low level in Volts
         '''
         logging.debug(__name__ + ' : Get lower bound of marker2 of channel %s' % channel)
-        return float(self._visainstrument.ask('SOUR%s:MARK2:VOLT:LEV:IMM:LOW?' % channel))
+        return float(self._visainstrument.query('SOUR%s:MARK2:VOLT:LEV:IMM:LOW?' % channel))
 
     def do_set_marker2_low(self, low, channel):
         '''
@@ -871,7 +871,7 @@ class Tektronix_AWG5014(Instrument):
             high (float) : high level in Volts
         '''
         logging.debug(__name__ + ' : Get upper bound of marker2 of channel %s' % channel)
-        return float(self._visainstrument.ask('SOUR%s:MARK2:VOLT:LEV:IMM:HIGH?' % channel))
+        return float(self._visainstrument.query('SOUR%s:MARK2:VOLT:LEV:IMM:HIGH?' % channel))
 
     def do_set_marker2_high(self, high, channel):
         '''
@@ -899,7 +899,7 @@ class Tektronix_AWG5014(Instrument):
             None
         '''
         logging.debug(__name__ + ' : Get status of channel %s' % channel)
-        outp = self._visainstrument.ask('OUTP%s?' % channel)
+        outp = self._visainstrument.query('OUTP%s?' % channel)
         if (outp=='0'):
             return 'off'
         elif (outp=='1'):
@@ -929,10 +929,10 @@ class Tektronix_AWG5014(Instrument):
             logging.debug(__name__ + ' : Try to set status to invalid value %s' % status)
             print 'Tried to set status to invalid value %s' % status
 
-    #  Ask for string with filenames
+    #  query for string with filenames
     def get_filenames(self):
         logging.debug(__name__ + ' : Read filenames from instrument')
-        return self._visainstrument.ask('MMEM:CAT? "MAIN"')
+        return self._visainstrument.query('MMEM:CAT? "MAIN"')
 
     # Send waveform to the device
     def send_waveform(self,w,m1,m2,filename,clock):
@@ -968,7 +968,7 @@ class Tektronix_AWG5014(Instrument):
         ws = ''
         for i in range(0,len(w)):
             ws = ws + struct.pack('<fB', w[i], int(m[i]))
-        
+
         s1 = 'MMEM:DATA "%s",' % filename
         s3 = 'MAGIC 1000\n'
         s5 = ws
@@ -1017,4 +1017,3 @@ class Tektronix_AWG5014(Instrument):
 
         self.send_waveform(w,m1,m2,filename,clock)
         self.do_set_filename(filename, channel)
-

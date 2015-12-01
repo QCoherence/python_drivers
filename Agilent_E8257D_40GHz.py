@@ -42,11 +42,12 @@ class Agilent_E8257D_40GHz(Instrument):
         '''
         logging.info(__name__ + ' : Initializing instrument Agilent_E8257D')
         Instrument.__init__(self, name, tags=['physical'])
+        rm = visa.ResourceManager()
 
         # Add some global constants
         self._address = address
         try:
-            self._visainstrument = visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
 
@@ -116,7 +117,7 @@ class Agilent_E8257D_40GHz(Instrument):
             ampl (?) : power in ?
         '''
         logging.debug(__name__ + ' : get power')
-        return float(self._visainstrument.ask('POW:AMPL?'))
+        return float(self._visainstrument.query('POW:AMPL?'))
 
     def do_set_power(self, amp):
         '''
@@ -142,7 +143,7 @@ class Agilent_E8257D_40GHz(Instrument):
             phase (float) : Phase in radians
         '''
         logging.debug(__name__ + ' : get phase')
-        return float(self._visainstrument.ask('PHASE?'))
+        return float(self._visainstrument.query('PHASE?'))
 
     def do_set_phase(self, phase):
         '''
@@ -168,7 +169,7 @@ class Agilent_E8257D_40GHz(Instrument):
             freq (float) : Frequency in Hz
         '''
         logging.debug(__name__ + ' : get frequency')
-        return float(self._visainstrument.ask('FREQ:CW?'))
+        return float(self._visainstrument.query('FREQ:CW?'))
 
     def do_set_frequency(self, freq):
         '''
@@ -194,11 +195,14 @@ class Agilent_E8257D_40GHz(Instrument):
             status (string) : 'On' or 'Off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('OUTP?')
 
-        if (stat=='1\n'):
+        # Output can be '0', '1' or '0\n', '1\n' which are different strings.
+        # By using int() we can only get 1 or 0 independently of the OS.
+        stat = int(self._visainstrument.query('OUTP?'))
+
+        if stat == 1:
           return 'on'
-        elif (stat=='0\n'):
+        elif stat == 0:
           return 'off'
         else:
           raise ValueError('Output status not specified : %s' % stat)
@@ -232,11 +236,13 @@ class Agilent_E8257D_40GHz(Instrument):
             status (string) : 'On' or 'Off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask(':pulm:stat?')
+        # Output can be '0', '1' or '0\n', '1\n' which are different strings.
+        # By using int() we can only get 1 or 0 independently of the OS.
+        stat = int(self._visainstrument.query(':pulm:stat?'))
 
-        if (stat=='1\n'):
+        if stat == 1:
           return 'on'
-        elif (stat=='0\n'):
+        elif stat == 0:
           return 'off'
         else:
           raise ValueError('Output status not specified : %s' % stat)
@@ -270,7 +276,7 @@ class Agilent_E8257D_40GHz(Instrument):
             type (string) :'square', 'frun', 'trigered', 'doublet', 'gated'
         '''
         logging.debug(__name__ + ' : get pulse type')
-        stat = self._visainstrument.ask(':pulm:source:internal?')
+        stat = self._visainstrument.query(':pulm:source:internal?')
 
         return stat
 
@@ -293,7 +299,7 @@ class Agilent_E8257D_40GHz(Instrument):
             self._visainstrument.write(':pulm:source:external')
         else:
             raise ValueError("set_pulse_type(): can only set on'square', 'frun', 'trigered', 'doublet', 'gated', 'external'")
-        
+
 
     def do_get_pulse_period(self):
         '''
@@ -306,7 +312,7 @@ class Agilent_E8257D_40GHz(Instrument):
             period (float) : repetition period in second
         '''
         logging.debug(__name__ + ' : get pulse period')
-        stat = self._visainstrument.ask(':pulm:internal:period?')
+        stat = self._visainstrument.query(':pulm:internal:period?')
 
         return stat
 
@@ -334,7 +340,7 @@ class Agilent_E8257D_40GHz(Instrument):
             width (float) : width in second
         '''
         logging.debug(__name__ + ' : get pulse width')
-        stat = self._visainstrument.ask(':pulm:internal:pwidth?')
+        stat = self._visainstrument.query(':pulm:internal:pwidth?')
 
         return stat
 
@@ -383,26 +389,26 @@ class Agilent_E8257D_40GHz(Instrument):
 #
 #
 #########################################################
-    
+
     def do_set_freqsweep(self, freqsweep='off'):
         '''
     	Set the frequency sweep mode to 'on' or 'off'
-        
+
         Input:
             status (string): 'on' or 'off'
         Output:
             None
         '''
         logging.debug(__name__ + ' : set frequency sweep mode to %s' % freqsweep)
-                
+
         if freqsweep.upper() in ('ON'):
             self._visainstrument.write('SOURce:FREQuency:MODE SWEep')
         elif freqsweep.upper() in ('OFF'):
             self._visainstrument.write('SOURce:FREQuency:MODE CW')
         else:
-            raise ValueError('set_freqsweep(): can only set on or off')	
+            raise ValueError('set_freqsweep(): can only set on or off')
 
-			
+
     def do_get_freqsweep(self):
         '''
         Get the status of the frequency sweep mode from the instrument
@@ -413,34 +419,36 @@ class Agilent_E8257D_40GHz(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get frequency sweep mode status')
-        stat = self._visainstrument.ask('SWE:RUNN?')
+        # Output can be '0', '1' or '0\n', '1\n' which are different strings.
+        # By using int() we can only get 1 or 0 independently of the OS.
+        stat = self._visainstrument.query('SWE:RUNN?')
 
-        if (stat=='1\n'):
+        if stat == 1:
           return 'on'
-        elif (stat=='0\n'):
+        elif stat == 0:
           return 'off'
         else:
           raise ValueError('Output status not specified : %s' % stat)
         return
 
-	###################### Methods for the frequency sweep mode ########################	
-		
+	###################### Methods for the frequency sweep mode ########################
+
     def set_dwelltime(self, dwelltime=100):
         '''
     	Set the dwell time of the frequency sweep mode
-        
+
         Input:
             dwelltime (float): time between two frequency steps
         Output:
             None
         '''
         logging.debug(__name__ + ' : set the dwell time of the frequency sweep mode to %s' % dwelltime)
-        self._visainstrument.write('SWE:DWEL '+str(float(dwelltime))+ 'ms')        
+        self._visainstrument.write('SWE:DWEL '+str(float(dwelltime))+ 'ms')
 
     def set_sweepmode(self, sweepmode='single'):
         '''
     	Set the frequency sweep mode
-        
+
         Input:
             sweepmode (string): AUTO or SINGLE
         Output:
@@ -452,7 +460,7 @@ class Agilent_E8257D_40GHz(Instrument):
             self._visainstrument.write('SWEep:GENeration STEPped')
             self._visainstrument.write('TRIGger:SOURce IMMediate')
             self._visainstrument.write('INITiate:CONTinuous ON')
-            
+
         elif sweepmode.upper() in ('SINGLE'):
             self._visainstrument.write('SWE:MODE AUTO')
             self._visainstrument.write('SWEep:GENeration STEPped')
@@ -460,11 +468,11 @@ class Agilent_E8257D_40GHz(Instrument):
             self._visainstrument.write('INITiate:CONTinuous ON')
         else:
             raise ValueError('set_sweepmode(): can only set AUTO or SINGLE')
-			
+
     # def set_spacingfreq(self, spacingfreq='linear'):
         # '''
     	# Define the type of frequency spacing for the sweep: linear or log
-        
+
         # Input:
             # spacingfreq (string): linear or log
         # Output:
@@ -476,37 +484,37 @@ class Agilent_E8257D_40GHz(Instrument):
         # elif spacingfreq.upper() in ('LOG'):
             # self._visainstrument.write('SWE:SPAC LOG')
         # else:
-            # raise ValueError('set_spacingfreq(): can only set LINEAR or LOG')			
-            
+            # raise ValueError('set_spacingfreq(): can only set LINEAR or LOG')
+
     def startsweep(self):
         '''
     	Start the frequency sweep. Valid in the 'SINGLE' sweep mode.
-        
+
         Input:
             None
         Output:
             None
         '''
         logging.debug(__name__ + ' : start the frequency sweep')
-        self._visainstrument.write('FREQ:MODE SWE')	
+        self._visainstrument.write('FREQ:MODE SWE')
 
-    
+
     def restartsweep(self):
         '''
     	Restart the frequency sweep.
-        
+
         Input:
             None
         Output:
             None
         '''
         logging.debug(__name__ + ' : restart the frequency sweep')
-        self._visainstrument.write('SOUR:SWE:RES')	
-		
+        self._visainstrument.write('SOUR:SWE:RES')
+
     def set_startfreq(self,startfreq):
         '''
     	Define the start frequency of the sweep.
-        
+
         Input:
             startfreq (float): first frequency of the sweep
         Output:
@@ -518,7 +526,7 @@ class Agilent_E8257D_40GHz(Instrument):
     def set_stopfreq(self,stopfreq):
         '''
     	Define the stop frequency of the sweep.
-        
+
         Input:
             stopfreq (float): last frequency of the sweep
         Output:
@@ -530,7 +538,7 @@ class Agilent_E8257D_40GHz(Instrument):
     def set_stepfreq(self,stepfreq):
         '''
     	Define the step frequency of the sweep in linear spacing mode.
-        
+
         Input:
             stepfreq (float): step frequency of the sweep in GHz
         Output:
@@ -538,11 +546,11 @@ class Agilent_E8257D_40GHz(Instrument):
         '''
         logging.debug(__name__ + ' : Step frequency is set to %s' % stepfreq)
         self._visainstrument.write('FREQ:STEP '+str(float(stepfreq))+'GHz')
-        
+
     def set_points(self,points):
         '''
     	Define the number of points of the sweep in linear spacing mode.
-        
+
         Input:
             points (int): number of points
         Output:

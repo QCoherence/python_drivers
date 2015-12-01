@@ -53,11 +53,13 @@ class Agilent_MXA(Instrument):
         Output:
             None
         '''
-        
+
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
+        rm = visa.ResourceManager()
+
         self._address = address
-        self._visainstrument = visa.instrument(self._address)
+        self._visainstrument = rm.open_resource(self._address)
 
         self.add_parameter('resBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
         self.add_parameter('vidBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=0.01, maxval=3e8, type=types.FloatType)
@@ -72,16 +74,16 @@ class Agilent_MXA(Instrument):
         self.add_function('set_resBWautoOff')
         self.add_function('set_averageon')
         self.add_function('set_clearaverage')
-        
+
 #        self.add_parameter('interval', minval=1e-3, maxval= 500, units='s', flags=Instrument.FLAG_GETSET, type=types.FloatType)
-        
+
         self.add_function('get_all')
         self.add_function('reset')
 
-        
+
         if reset :
             self.reset()
-        
+
         self.get_all()
 
     # Functions
@@ -118,7 +120,7 @@ class Agilent_MXA(Instrument):
         self.get_numpoints()
         self.get_span()
         self.get_averagetype()
-        
+
 #########################################################
 #
 #
@@ -134,10 +136,10 @@ class Agilent_MXA(Instrument):
             None
 
         Output:
-            inputattenuation (float) : The inputattenuation 
+            inputattenuation (float) : The inputattenuation
         '''
         logging.debug(__name__ + ' : Get the input attenuation')
-        return float(self._visainstrument.ask(':SENSe:POWer:RF:ATTenuation? '))
+        return float(self._visainstrument.query(':SENSe:POWer:RF:ATTenuation? '))
 
 
 
@@ -162,8 +164,8 @@ class Agilent_MXA(Instrument):
 #########################################################
     def tell(self, cmd):
         self._visainstrument.write(cmd)
-    def ask(self, cmd):
-        res= self._visainstrument.ask(cmd + '?')
+    def query(self, cmd):
+        res= self._visainstrument.query(cmd + '?')
         print res
         return res
 #########################################################
@@ -184,7 +186,7 @@ class Agilent_MXA(Instrument):
             inputattenuation (boolean) : The inputattenuation mode
         '''
         logging.debug(__name__ + ' : Get the input attenuation mode')
-        ans= int(self._visainstrument.ask(':SENSe:POWer:RF:ATTenuation:AUTO?'))
+        ans= int(self._visainstrument.query(':SENSe:POWer:RF:ATTenuation:AUTO?'))
         if ans:
             return 'AUTO'
         else:
@@ -224,7 +226,7 @@ class Agilent_MXA(Instrument):
             numpoints (int) : The number of points
         '''
         logging.debug(__name__ + ' : Get the number of points')
-        ans= self._visainstrument.ask(':SENSe:SWEep:POINts? ')
+        ans= self._visainstrument.query(':SENSe:SWEep:POINts? ')
         return ans
 
 
@@ -258,7 +260,7 @@ class Agilent_MXA(Instrument):
             interval (float) : The interval between each cycle
         '''
         logging.debug(__name__ + ' : Get the interval between each cycle')
-        return float(self._visainstrument.ask(':SENSe:BANDwidth:RESolution?'))
+        return float(self._visainstrument.query(':SENSe:BANDwidth:RESolution?'))
 
 
 
@@ -303,7 +305,7 @@ class Agilent_MXA(Instrument):
             interval (float) : Number of points per second
         '''
         logging.debug(__name__ + ' : Get the number of points per second')
-        return float(self._visainstrument.ask(':SENS:BAND:VID?'))
+        return float(self._visainstrument.query(':SENS:BAND:VID?'))
 
 
 
@@ -348,7 +350,7 @@ class Agilent_MXA(Instrument):
             centerfrequency (float) : The center frequency between each cycle
         '''
         logging.debug(__name__ + ' : Get the center frequency ')
-        return float(self._visainstrument.ask(':SENSe:FREQuency:CENTer?'))
+        return float(self._visainstrument.query(':SENSe:FREQuency:CENTer?'))
 
 
 
@@ -381,7 +383,7 @@ class Agilent_MXA(Instrument):
             span(float) : The span
         '''
         logging.debug(__name__ + ' : Get the center frequency ')
-        return float(self._visainstrument.ask(':SENSe:FREQuency:SPAN?'))
+        return float(self._visainstrument.query(':SENSe:FREQuency:SPAN?'))
 
 
 
@@ -397,7 +399,7 @@ class Agilent_MXA(Instrument):
         '''
         logging.debug(__name__ + ' : Set the span %.6f' % (span))
         self._visainstrument.write(':SENSe:FREQuency:SPAN '+str(span))
-        
+
 #########################################################
 #
 #
@@ -416,7 +418,7 @@ class Agilent_MXA(Instrument):
             averages (int) : The number of averages
         '''
         logging.debug(__name__ + ' : Get the number of averages ')
-        return int(self._visainstrument.ask(':SENSe:AVERage:COUNt?'))
+        return int(self._visainstrument.query(':SENSe:AVERage:COUNt?'))
 
 
 
@@ -432,7 +434,7 @@ class Agilent_MXA(Instrument):
         '''
         logging.debug(__name__ + ' : Set the number of averages to %d' % (averages))
         self._visainstrument.write(':SENSe:AVERage:COUNt '+str(averages))
-        
+
     def set_averageon(self,trace=1):
         '''
         turns on trace averaging
@@ -478,7 +480,7 @@ class Agilent_MXA(Instrument):
             String
         '''
         logging.debug(__name__ + ' : get averaging type')
-        return self._visainstrument.ask(':SENSe:AVERage:TYPE?')
+        return self._visainstrument.query(':SENSe:AVERage:TYPE?')
 #########################################################
 #
 #
@@ -497,7 +499,7 @@ class Agilent_MXA(Instrument):
             power units (float) : The output power units
         '''
         logging.debug(__name__ + ' : get the power units ')
-        return self._visainstrument.ask(':UNIT:POWer?')
+        return self._visainstrument.query(':UNIT:POWer?')
 
     def set_powunits(self,units='DBM'):
         '''
@@ -535,7 +537,7 @@ class Agilent_MXA(Instrument):
         '''
         logging.debug(__name__ + ' : Get the data ')
         qt.mstart()
-        sweep_time= float(self._visainstrument.ask(':SENSe:SWEep:TIME?'))
+        sweep_time= float(self._visainstrument.query(':SENSe:SWEep:TIME?'))
         #print sweep_time
         self._visainstrument.write(':INIT:CONT OFF')
         self._visainstrument.write(':INIT:IMMediate')
@@ -546,14 +548,13 @@ class Agilent_MXA(Instrument):
 #        print time.ctime()
 #        print 'reading'
         try:
-            datastr = self._visainstrument.ask(':FETCh:SANalyzer'+str(n)+'?')
+            datastr = self._visainstrument.query(':FETCh:SANalyzer'+str(n)+'?')
         except Exception as error:
             pass
         finally:
-            datastr = self._visainstrument.ask(':FETCh:SANalyzer'+str(n)+'?')
-            
+            datastr = self._visainstrument.query(':FETCh:SANalyzer'+str(n)+'?')
+
         if enable_continuous:
             self._visainstrument.write(':INIT:CONT ON')
         qt.mend()
         return np.reshape(np.array(datastr.split(','),dtype=float),(-1,2))
-        

@@ -48,16 +48,14 @@ class ZNB20V2(Instrument):
         logging.debug(__name__ + ' : Initializing instrument')
 
         Instrument.__init__(self, name, tags=['physical'])
-
-
-        self._address = address
+        rm = visa.ResourceManager
 
         try:
-            self._visainstrument =visa.instrument(self._address)
+            self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        self._visainstrument.term_chars = '\n'
-
+        self._visainstrument.write_termination = '\n'
+        self._visainstrument.read_termination = '\n'
 
         self.add_parameter('frequencyspan', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
         self.add_parameter('centerfrequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
@@ -218,7 +216,7 @@ class ZNB20V2(Instrument):
         #Set the standard event register (ESR) to zero
         self._visainstrument.write('*CLS')
         #self._visainstrument.write('init:imm')
-		#self._visainstrument.write('*WAI')
+        #self._visainstrument.write('*WAI')
         #self._visainstrument.write('*OPC')
         self._visainstrument.write('INITiate1:IMMediate; *OPC')
 
@@ -237,15 +235,15 @@ class ZNB20V2(Instrument):
         logging.info(__name__ + ' : start to measure and wait till it is finished')
 
 
-        while self._visainstrument.ask('*ESR?') != '1':
+        while self._visainstrument.query('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			#dstring=self._visainstrument.ask('calculate:Data:NSweep? Sdata, 1 ')
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			#self._visainstrument.write('init:cont on')
-			dstringclean=dstring.split(';')[0]
-			real,im= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			return real+im*1j
+            #dstring=self._visainstrument.query('calculate:Data:NSweep? Sdata, 1 ')
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            #self._visainstrument.write('init:cont on')
+            dstringclean=dstring.split(';')[0]
+            real,im= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            return real+im*1j
 
     def get2trace(self,trace1,trace2):
         '''
@@ -262,20 +260,20 @@ class ZNB20V2(Instrument):
         logging.info(__name__ + ' : start to measure and wait till it is finished')
 
 
-        while self._visainstrument.ask('*ESR?') != '1':
+        while self._visainstrument.query('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean=dstring.split(';')[0]
-			real1,im1= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            dstringclean=dstring.split(';')[0]
+            real1,im1= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
 
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean=dstring.split(';')[0]
-			real2,im2= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            dstringclean=dstring.split(';')[0]
+            real2,im2= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
 
-			return real1+im1*1j,real2+im2*1j
+            return real1+im1*1j,real2+im2*1j
 
 
     def get4trace(self,trace1,trace2,trace3,trace4):
@@ -293,33 +291,33 @@ class ZNB20V2(Instrument):
         logging.info(__name__ + ' : start to measure and wait till it is finished')
 
 
-        while self._visainstrument.ask('*ESR?') != '1':
+        while self._visainstrument.query('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean=dstring.split(';')[0]
-			real1,im1= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            self._visainstrument.write('calc:parameter:sel  "%s"' %(trace1))
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            dstringclean=dstring.split(';')[0]
+            real1,im1= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
 
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean=dstring.split(';')[0]
-			real2,im2= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            self._visainstrument.write('calc:parameter:sel  "%s"' %(trace2))
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            dstringclean=dstring.split(';')[0]
+            real2,im2= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
 
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace3))
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean=dstring.split(';')[0]
-			real3,im3= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            self._visainstrument.write('calc:parameter:sel  "%s"' %(trace3))
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            dstringclean=dstring.split(';')[0]
+            real3,im3= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
 
-			self._visainstrument.write('calc:parameter:sel  "%s"' %(trace4))
-			dstring=self._visainstrument.ask('calculate:Data? Sdata')
-			dstringclean=dstring.split(';')[0]
-			real4,im4= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            self._visainstrument.write('calc:parameter:sel  "%s"' %(trace4))
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            dstringclean=dstring.split(';')[0]
+            real4,im4= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
 
-			#estring=self._visainstrument.ask('system:error:all?')
-			#print estring
+            #estring=self._visainstrument.query('system:error:all?')
+            #print estring
 
-			return real1+im1*1j,real2+im2*1j,real3+im3*1j,real4+im4*1j
+            return real1+im1*1j,real2+im2*1j,real3+im3*1j,real4+im4*1j
 
 
     def averageclear(self):
@@ -338,7 +336,7 @@ class ZNB20V2(Instrument):
 
     def set_trigger(self, trigger='IMM'):
         '''
-    	Define the source of the trigger: IMMediate (free run measurement or untriggered), EXTernal, MANual or MULTiple
+        Define the source of the trigger: IMMediate (free run measurement or untriggered), EXTernal, MANual or MULTiple
 
         Input:
             trigger (string): IMM, EXT, MAN or MULT
@@ -362,25 +360,20 @@ class ZNB20V2(Instrument):
         Define the link of the trigger: SWEep (trigger event starts an entire sweep), SEGMent (trigger event starts a sweep segment), POINt (trigger event starts measurement at the next sweep point) or PPOint (trigger event starts the next partial measurement at the current or at the next sweep point).
 
         Input:
-            lin (string): SWE, SEGM, POIN or PPOIN
+            lin (string): SWE, SEGM, POIN or PPO
         Output:
             None
         '''
         logging.debug(__name__ + ' : The link of the trigger is set to %s' % link)
-        if link.upper() in ('SWE'):
-            self._visainstrument.write('TRIG:LINK'+str('SWE'))
-        elif link.upper() in ('SEGM'):
-            self._visainstrument.write('TRIG:LINK'+str('SEGM'))
-        elif link.upper() in ('POIN'):
-            self._visainstrument.write('TRIG:LINK'+str('POIN'))
-        elif link.upper() in ('PPOIN'):
-            self._visainstrument.write('TRIG:LINK'+str('PPOIN'))
+
+        if link.upper() in ('SWE', 'SEGM', 'POIN', 'PPO'):
+            self._visainstrument.write("TRIG:LINK '"+str(link.upper())+"'")
         else:
-            raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPOIN')
+            raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPO')
 
     def set_sweeptype(self, sweeptype='LIN'):
         '''
-    	Define the type of the sweep: LINear | LOGarithmic | POWer | CW | POINt | SEGMent
+        Define the type of the sweep: LINear | LOGarithmic | POWer | CW | POINt | SEGMent
 
         Input:
             sweeptype (string): LIN, LOG, POW, CW, POIN or SEG
@@ -412,8 +405,8 @@ class ZNB20V2(Instrument):
 
     def tell(self, cmd):
         self._visainstrument.write(cmd)
-    def ask(self, cmd):
-        res= self._visainstrument.ask(cmd + '?')
+    def query(self, cmd):
+        res= self._visainstrument.query(cmd + '?')
         print res
         return res
 
@@ -450,7 +443,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:center?')
+        return self._visainstrument.query('frequency:center?')
 
     def do_set_frequencyspan(self, frequencyspan=1.):
         '''
@@ -464,7 +457,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Set the frequency of the instrument')
-        self._visainstrument.write('frequency:span '+str(stopfrequency))
+        self._visainstrument.write('frequency:span '+str(frequencyspan))
 
 
     def do_get_frequencyspan(self):
@@ -479,7 +472,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:span?')
+        return self._visainstrument.query('frequency:span?')
 
 
     def do_set_startfrequency(self, startfrequency=1.):
@@ -509,7 +502,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:start?')
+        return self._visainstrument.query('frequency:start?')
 
     def do_set_stopfrequency(self, stopfrequency=1.):
         '''
@@ -538,7 +531,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the frequency of the instrument')
-        return self._visainstrument.ask('frequency:stop?')
+        return self._visainstrument.query('frequency:stop?')
 
     def do_set_cwfrequency(self, cwfrequency=1.):
         '''
@@ -566,7 +559,9 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the CW frequency of the instrument')
-        return self._visainstrument.ask('SOUR:FREQ:CW?')
+
+        return self._visainstrument.query('SOUR:FREQ:CW?')
+
 
 #########################################################
 #
@@ -603,7 +598,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the power of the instrument')
-        return self._visainstrument.ask('source:power?')
+        return self._visainstrument.query('source:power?')
 
 
     def do_set_startpower(self, startpower=-40.):
@@ -701,7 +696,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the averages of the instrument')
-        return self._visainstrument.ask('average:count?')
+        return self._visainstrument.query('average:count?')
 
     def do_get_averagestatus(self):
         """
@@ -715,13 +710,13 @@ class ZNB20V2(Instrument):
             status (string) : 'on' or 'off'
         """
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('average?')
+        stat = self._visainstrument.query('average?')
         if stat=='1':
           return 'on'
         elif stat=='0':
           return 'off'
         else:
-		  raise ValueError('Output status not specified : %s' % stat)
+          raise ValueError('Output status not specified : %s' % stat)
 
     def do_set_averagestatus(self, status='off'):
         '''
@@ -779,7 +774,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the BW of the instrument')
-        return self._visainstrument.ask('sens:band?')
+        return self._visainstrument.query('sens:band?')
 
 
 #########################################################
@@ -817,7 +812,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the BW of the instrument')
-        return self._visainstrument.ask('sens:sweep:points?')
+        return self._visainstrument.query('sens:sweep:points?')
 
 #########################################################
 #
@@ -855,7 +850,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the sweeps of the instrument')
-        return self._visainstrument.ask('sens:sweep:count?')
+        return self._visainstrument.query('sens:sweep:count?')
 
 #########################################################
 #
@@ -874,7 +869,7 @@ class ZNB20V2(Instrument):
             status (string) : 'on' or 'off'
         '''
         logging.debug(__name__ + ' : get status')
-        stat = self._visainstrument.ask('output?')
+        stat = self._visainstrument.query('output?')
 
         if (stat=='1'):
           return 'on'
