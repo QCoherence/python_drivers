@@ -165,8 +165,8 @@ class Tabor_WX1284C(Instrument):
         if reset:
             self.reset()
             self.clear_err()
-        else:
-            self.get_all()
+
+        self.get_all()
 
     # Functions ###############################################################
     def clean_visa_open(self):
