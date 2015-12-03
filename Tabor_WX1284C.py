@@ -106,6 +106,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('trigger_timer_mode', type=types.StringType,
             option_list=['TIME', 'DEL'],
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_timer_time', type=types.FloatType,
+            minval = 0.2, maxval=20e6, units='us',
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('output', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
@@ -263,6 +266,7 @@ class Tabor_WX1284C(Instrument):
         self.get_trigger_mode()
         self.get_trigger_source()
         self.get_trigger_timer_mode()
+        self.get_trigger_timer_time()
         self.get_trace_mode()
 
         for i in Channels:
@@ -542,6 +546,44 @@ class Tabor_WX1284C(Instrument):
 
             logging.info('Trigger timer mode was not set properly')
             raise ValueError('Trigger timer mode was not set properly')
+
+    def do_get_trigger_timer_time(self):
+        '''
+        Get the trigger timer time of the instrument
+
+        Input:
+            None
+
+        Output:
+            Trigger timer time (float): The period in us.
+        '''
+
+        logging.info( '{} : Getting the trigger timer time')
+        return float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6
+
+    def do_set_trigger_timer_time(self, period):
+        '''
+            Use this command to set or query the delay setting of the internal delayed
+            trigger generator. This value is associated with the internal trigger run mode
+            only and has no effect on other trigger modes. The internal delayed trigger
+            generator is a free-running oscillator, asynchronous with the frequency of the
+            output waveform. The timer intervals are measured from waveform stop to waveform
+            start.
+
+        Input:
+            Trigger timer time (float): The period in us.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger timer time to {}'.format(__name__,period))
+        self._visainstrument.write(':TRIG:TIM:TIME '+str(period*1e-6))
+
+        if float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6 != period:
+            print float(self._visainstrument.query(':TRIG:TIM:TIME?')), period
+            logging.info('Trigger timer time was not set properly')
+            raise ValueError('Trigger timer time was not set properly')
 
     def do_set_output(self, state='ON', channel=1):
         '''
