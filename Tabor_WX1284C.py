@@ -103,6 +103,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('trigger_mode', type=types.StringType,
             option_list=['NORM', 'OVER'],
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_timer_mode', type=types.StringType,
+            option_list=['TIME', 'DEL'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('output', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
@@ -259,6 +262,7 @@ class Tabor_WX1284C(Instrument):
         self.get_trigger_level()
         self.get_trigger_mode()
         self.get_trigger_source()
+        self.get_trigger_timer_mode()
         self.get_trace_mode()
 
         for i in Channels:
@@ -270,8 +274,8 @@ class Tabor_WX1284C(Instrument):
         for i in Mark_num:
             self.get('m%d_marker_status_1_2' % i)
             self.get('m%d_marker_status_3_4' % i)
-            self.get('m%d_marker_high_1_2' % i)
-            self.get('m%d_marker_high_3_4' % i)
+            # self.get('m%d_marker_high_1_2' % i)
+            # self.get('m%d_marker_high_3_4' % i)
 
     def init_channel(self,channel=1):
         '''
@@ -499,6 +503,45 @@ class Tabor_WX1284C(Instrument):
 
             logging.info('Trigger mode was not set properly')
             raise ValueError('Trigger mode was not set properly')
+
+    def do_get_trigger_timer_mode(self):
+        '''
+        Get the trigger timer mode of the instrument
+
+        Input:
+            None
+
+        Output:
+            Trigger mode (string): 'TIME', 'DEL'.
+        '''
+
+        logging.info( '{} : Getting the trigger timer mode')
+        return self._visainstrument.query(':TRIG:TIM:MODE?')
+
+    def do_set_trigger_timer_mode(self, value='TIME'):
+        '''
+            Use this command to set or query the mode that the internal trigger
+            generator will operate. Timed defines start-to-start triggers and
+            Delayed defines end-to-start triggers. The timer commands will
+            affect the generator only after it has been programmed to operate
+            in timer mode. Modify the WX2184C to trigger run mode using the
+            init:cont off command and program the internal timer using the
+            trig:tim command.
+
+        Input:
+            Trigger source (string): 'TIME', 'DEL'.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger timer mode to {}'.format(__name__,value))
+        self._visainstrument.write(':TRIG:TIM:MODE '+str(value.upper()))
+
+        if self._visainstrument.query(':TRIG:TIM:MODE?') != value.upper():
+
+            logging.info('Trigger timer mode was not set properly')
+            raise ValueError('Trigger timer mode was not set properly')
 
     def do_set_output(self, state='ON', channel=1):
         '''
