@@ -416,20 +416,54 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value {} was sent to set_trigger_mode method'.format(value))
             raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
 
-    def do_get_output(self, channel=1):
+    def do_set_trigger_source(self, value='TIM'):
         '''
-        Gets the state of a given channel: ON or OFF
+        Sets the trigger mode of the instrument
 
         Input:
-            channel (string): Channel ID
+            Trigger mode (string): 'CONT', 'TRIG', 'GATE' depending on the mode
 
         Output:
-            Output state (string): 'ON' or 'OFF'
+            None
         '''
-        logging.info( __name__+ ': Getting the output state of channel %s' % channel)
 
-        self.channel_select(channel)
-        return self._visainstrument.query('OUTP?')
+        if value.upp in
+        raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
+
+
+
+        logging.info( '{} : Setting the trigger source to {}'.format(__name__,value))
+        self._visainstrument.write(':TRIG:SOUR:ADV '+str(value.upper()))
+
+        if self._visainstrument.query(':TRIG:SOUR:ADV?') != value.upper():
+
+            logging.info('Trigger mode wasn\'t set properly')
+
+
+
+
+        if value.upper() == ':
+            self._visainstrument.write('INIT:CONT ON')
+            if self._visainstrument.query('INIT:CONT?') != 'ON':
+                logging.info('Trigger mode wasn\'t set properly')
+        elif value.upper() == 'TRIG':
+            self._visainstrument.write('INIT:CONT OFF')
+            self._visainstrument.write('INIT:GATE OFF')
+                logging.info('Trigger mode wasn\'t set properly')
+            elif self._visainstrument.query('INIT:GATE?') != 'OFF':
+                logging.info('Trigger mode wasn\'t set properly')
+        elif value.upper() == 'GATE':
+            self._visainstrument.write('INIT:CONT OFF')
+            self._visainstrument.write('INIT:GATE ON')
+            if self._visainstrument.query('INIT:CONT?') != 'OFF':
+                logging.info('Trigger mode wasn\'t set properly')
+            elif self._visainstrument.query('INIT:GATE?') != 'ON':
+                logging.info('Trigger mode wasn\'t set properly')
+        else:
+            logging.info('The invalid value {} was sent to set_trigger_mode method'.format(value))
+            raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
+
+
 
     def do_set_output(self, state='ON', channel=1):
         '''
