@@ -100,6 +100,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('trigger_source', type=types.StringType,
             option_list=['EXT', 'BUS', 'TIM', 'EVEN'],
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_mode', type=types.StringType,
+            option_list=['NORM', 'OVER'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('output', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
@@ -254,6 +257,8 @@ class Tabor_WX1284C(Instrument):
         self.get_clock_source()
         self.get_clock_freq()
         self.get_trigger_level()
+        self.get_trigger_mode()
+        self.get_trigger_source()
         self.get_trace_mode()
 
         for i in Channels:
@@ -436,7 +441,11 @@ class Tabor_WX1284C(Instrument):
 
     def do_set_trigger_source(self, value='TIM'):
         '''
-        Sets the trigger source of the instrument
+            Use this command to set or query the source of the trigger event
+            that will stimulate the WX2184C to generate waveforms. The source
+            advance command will affect the generator only after it has been
+            programmed to operate in trigger run mode. Modify the WX2184C to
+            trigger run mode using the init:cont off command.
 
         Input:
             Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
@@ -452,6 +461,44 @@ class Tabor_WX1284C(Instrument):
 
             logging.info('Trigger source was not set properly')
             raise ValueError('Trigger source was not set properly')
+
+    def do_get_trigger_mode(self):
+        '''
+        Get the trigger mode of the instrument
+
+        Input:
+            None
+
+        Output:
+            Trigger mode (string): 'NORM', 'OVER'.
+        '''
+
+        logging.info( '{} : Getting the trigger mode')
+        return self._visainstrument.query(':TRIG:MODE?')
+
+    def do_set_trigger_mode(self, value='NORM'):
+        '''
+            Use this command to define or query the trigger mode. In normal mode,
+            the first trigger activates the output and consecutive triggers are
+            ignored for the duration of the output waveform. In override mode,
+            the first trigger activates the output and consecutive triggers
+            restart the output waveform, regardless if the current waveform has
+            been completed or not.
+
+        Input:
+            Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger mode to {}'.format(__name__,value))
+        self._visainstrument.write(':TRIG:MODE '+str(value.upper()))
+
+        if self._visainstrument.query(':TRIG:MODE?') != value.upper():
+
+            logging.info('Trigger mode was not set properly')
+            raise ValueError('Trigger mode was not set properly')
 
     def do_set_output(self, state='ON', channel=1):
         '''
