@@ -94,7 +94,8 @@ class Tabor_WX1284C(Instrument):
         # Add parameters ######################################################
         self.add_parameter('func_mode', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
-        self.add_parameter('trigger_mode', type=types.StringType,
+        self.add_parameter('run_mode', type=types.StringType,
+            option_list=['CONT', 'TRIG', 'GATE'],
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('trigger_source', type=types.StringType,
             option_list=['EXT', 'BUS', 'TIM', 'EVEN'],
@@ -247,7 +248,7 @@ class Tabor_WX1284C(Instrument):
         logging.info(__name__ + ' : Reading all data from instrument')
 
         self.get_func_mode()
-        self.get_trigger_mode()
+        self.get_run_mode()
         self.get_ref_source()
         self.get_ref_freq()
         self.get_clock_source()
@@ -368,9 +369,9 @@ class Tabor_WX1284C(Instrument):
 
             raise ValueError('The invalid value {} was sent to func_mode method. Valid values are \'FIX\',\'USER\',\'SEQ\',\'ASEQ\',\'MOD\',\'PULS\',\'PATT\'.'.format(value))
 
-    def do_get_trigger_mode(self):
+    def do_get_run_mode(self):
         '''
-        Gets the trigger mode of the instrument
+        Gets the run mode of the instrument
 
         Input:
             None
@@ -378,7 +379,7 @@ class Tabor_WX1284C(Instrument):
         Output:
             Trigger mode (string): 'CONT', 'TRIG', 'GATE' depending on the mode
         '''
-        logging.info( '{} : Getting the trigger mode'.format(__name__))
+        logging.info( '{} : Getting the run mode'.format(__name__))
         if self._visainstrument.query('INIT:CONT?') == 'ON':
             return 'CONT'
         elif self._visainstrument.query('INIT:GATE?') == 'ON':
@@ -386,9 +387,9 @@ class Tabor_WX1284C(Instrument):
         else:
             return 'TRIG'
 
-    def do_set_trigger_mode(self, value='TRIG'):
+    def do_set_run_mode(self, value='TRIG'):
         '''
-        Sets the trigger mode of the instrument
+        Sets the run mode of the instrument
 
         Input:
             Trigger mode (string): 'CONT', 'TRIG', 'GATE' depending on the mode
@@ -396,28 +397,28 @@ class Tabor_WX1284C(Instrument):
         Output:
             None
         '''
-        logging.info( '{} : Setting the trigger mode to {}'.format(__name__,value))
+        logging.info( '{} : Setting the run mode to {}'.format(__name__,value))
         if value.upper() == 'CONT':
             self._visainstrument.write('INIT:CONT ON')
             if self._visainstrument.query('INIT:CONT?') != 'ON':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
         elif value.upper() == 'TRIG':
             self._visainstrument.write('INIT:CONT OFF')
             self._visainstrument.write('INIT:GATE OFF')
             if self._visainstrument.query('INIT:CONT?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
             elif self._visainstrument.query('INIT:GATE?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
         elif value.upper() == 'GATE':
             self._visainstrument.write('INIT:CONT OFF')
             self._visainstrument.write('INIT:GATE ON')
             if self._visainstrument.query('INIT:CONT?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
             elif self._visainstrument.query('INIT:GATE?') != 'ON':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
         else:
-            logging.info('The invalid value {} was sent to set_trigger_mode method'.format(value))
-            raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
+            logging.info('The invalid value {} was sent to set_run_mode method'.format(value))
+            raise ValueError('The invalid value {} was sent to set_run_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
 
     def do_get_trigger_source(self):
         '''
@@ -443,9 +444,6 @@ class Tabor_WX1284C(Instrument):
         Output:
             None
         '''
-
-        if not value.upper() in ('EXT', 'BUS', 'TIM', 'EVEN'):
-            raise ValueError('The invalid value {} was sent to set_trigger_source method. Valid values are \'EXT\', \'BUS\', \'TIM\', \'EVEN\'.'.format(value))
 
         logging.info( '{} : Setting the trigger source to {}'.format(__name__,value))
         self._visainstrument.write(':TRIG:SOUR:ADV '+str(value.upper()))
@@ -1117,13 +1115,13 @@ class Tabor_WX1284C(Instrument):
         intrv_end = intrv_start + intrv_len
 
         if intrv_start >= 0 and intrv_end <= self.period_len:
-            if self.is_for_trigger_mode:
+            if self.is_for_run_mode:
                 return [(intrv_start, intrv_len)]
             else:
                 return [(intrv_start + i * self.period_len, intrv_len)
                         for i in range(self.num_periods)]
 
-        if self.is_for_trigger_mode:
+        if self.is_for_run_mode:
             intrv_start = max(intrv_start, Decimal(0))
             intrv_end = min(intrv_end, self.period_len * self.num_periods)
             if intrv_end <= intrv_start:
