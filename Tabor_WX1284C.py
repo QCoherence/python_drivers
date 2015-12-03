@@ -96,6 +96,9 @@ class Tabor_WX1284C(Instrument):
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('trigger_mode', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_source', type=types.StringType,
+            option_list=['EXT', 'BUS', 'TIM', 'EVEN'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('output', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
@@ -416,54 +419,41 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value {} was sent to set_trigger_mode method'.format(value))
             raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
 
-    def do_set_trigger_source(self, value='TIM'):
+    def do_get_trigger_source(self):
         '''
-        Sets the trigger mode of the instrument
+        Get the trigger source of the instrument
 
         Input:
-            Trigger mode (string): 'CONT', 'TRIG', 'GATE' depending on the mode
+            None
+
+        Output:
+            Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
+        '''
+
+        logging.info( '{} : Getting the trigger source')
+        return self._visainstrument.query(':TRIG:SOUR:ADV?')
+
+    def do_set_trigger_source(self, value='TIM'):
+        '''
+        Sets the trigger source of the instrument
+
+        Input:
+            Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
 
         Output:
             None
         '''
 
-        if value.upp in
-        raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
-
-
+        if not value.upper() in ('EXT', 'BUS', 'TIM', 'EVEN'):
+            raise ValueError('The invalid value {} was sent to set_trigger_source method. Valid values are \'EXT\', \'BUS\', \'TIM\', \'EVEN\'.'.format(value))
 
         logging.info( '{} : Setting the trigger source to {}'.format(__name__,value))
         self._visainstrument.write(':TRIG:SOUR:ADV '+str(value.upper()))
 
         if self._visainstrument.query(':TRIG:SOUR:ADV?') != value.upper():
 
-            logging.info('Trigger mode wasn\'t set properly')
-
-
-
-
-        if value.upper() == ':
-            self._visainstrument.write('INIT:CONT ON')
-            if self._visainstrument.query('INIT:CONT?') != 'ON':
-                logging.info('Trigger mode wasn\'t set properly')
-        elif value.upper() == 'TRIG':
-            self._visainstrument.write('INIT:CONT OFF')
-            self._visainstrument.write('INIT:GATE OFF')
-                logging.info('Trigger mode wasn\'t set properly')
-            elif self._visainstrument.query('INIT:GATE?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
-        elif value.upper() == 'GATE':
-            self._visainstrument.write('INIT:CONT OFF')
-            self._visainstrument.write('INIT:GATE ON')
-            if self._visainstrument.query('INIT:CONT?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
-            elif self._visainstrument.query('INIT:GATE?') != 'ON':
-                logging.info('Trigger mode wasn\'t set properly')
-        else:
-            logging.info('The invalid value {} was sent to set_trigger_mode method'.format(value))
-            raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
-
-
+            logging.info('Trigger source was not set properly')
+            raise ValueError('Trigger source was not set properly')
 
     def do_set_output(self, state='ON', channel=1):
         '''
