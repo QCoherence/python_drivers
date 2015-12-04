@@ -621,6 +621,22 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid state {} was sent to set_output'.format(state))
             raise ValueError('The invalid state {} was sent to set_output. Valid values are \'ON\' or \'OFF\'.'.format(state))
 
+    def do_get_output(self, channel=1):
+        '''
+        Get the state of a given channel
+
+        Input:
+            channel (int): Channel ID
+
+        Output:
+            state (string): 'ON' or 'OFF'
+        '''
+
+        logging.info( __name__+' : Getting the output state of channel %s'%( channel))
+
+        self.channel_select(channel)
+        self._visainstrument.query('OUTP?')
+
     def do_get_coupling(self, channel=1):
         '''
         Gets the coupling mode of a given channel: 'DC' or 'HV'.
