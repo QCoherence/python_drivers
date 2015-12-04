@@ -136,6 +136,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('trigger_level', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             minval=-5, maxval=5, units='Volts')
+        self.add_parameter('marker_source', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            option_list=['WAVE', 'USER'])
         self.add_parameter('marker_status_1_2', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1,2), channel_prefix='m%d_')
@@ -258,16 +261,22 @@ class Tabor_WX1284C(Instrument):
 
         self.get_func_mode()
         self.get_run_mode()
+        self.get_trace_mode()
+
         self.get_ref_source()
         self.get_ref_freq()
+
+
         self.get_clock_source()
         self.get_clock_freq()
+
         self.get_trigger_level()
         self.get_trigger_mode()
         self.get_trigger_source()
         self.get_trigger_timer_mode()
         self.get_trigger_timer_time()
-        self.get_trace_mode()
+
+        self.get_marker_source()
 
         for i in Channels:
             self.get('ch%d_output' % i)
@@ -867,6 +876,40 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Getting the trigger level.' )
         return self._visainstrument.query('TRIG:LEV ?')
 
+    def do_set_marker_source(self, source='WAVE'):
+        '''
+        Use this command to set or query the source of the marker data. The
+        WAVE marker data is a single marker transition with a varying position
+        and width, similar to a SYNC output. The USER marker data enables the
+        user to program multiple marker transition, similar to a separate data
+        line, for example a clock. The USER data can only be programmed via a
+        remote interface. The marker width (or length) is limited to the
+        relevant segment length and has a resolution of 2.
+
+        Input:
+            source (string): 'WAVE', 'USER'
+        Output:
+            None
+        '''
+        logging.info( __name__+ ': Setting the marker source to %s.' % source)
+        self._visainstrument.write('MARK:SOUR %s' % source)
+
+        if self._visainstrument.query('MARK:SOUR?') != source.upper():
+            logging.info('The marker source wasn\'t set properly')
+            raise ValueError('The marker source wasn\'t set properly to set_marker_source. Valid value are \'WAVE\', \'USER\'.')
+
+    def do_get_marker_source(self):
+        '''
+        Gets the marker source.
+
+        Input:
+            None
+        Output:
+            source (string): 'WAVE', 'USER'
+        '''
+        logging.info( __name__+ ': Getting the marker source.' )
+        return self._visainstrument.query('MARK:SOUR?')
+
     def do_get_marker_status_1_2(self, channel=1):
         '''
         Gets the status of the marker number "channel" of the channel 1 or 2.
@@ -1023,7 +1066,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('Wrong number of the channel for the marker. Valid values are 1,2.')
 
         self._visainstrument.write('MARK:VOLT:HIGH %s' % high_level)
-        if self._visainstrument.query('MARK:VOLT:HIGH ?') != high_level:
+        if self._visainstrument.query('MARK:VOLT:HIGH?') != high_level:
             logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
             raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
 
