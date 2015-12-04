@@ -115,8 +115,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('coupling', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
-        self.add_parameter('channel synchronisation', type=types.StringType,
+        self.add_parameter('channels_synchronised', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            option_list=['ON', 'OFF']
             )
         self.add_parameter('ref_freq', type=types.IntType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
@@ -281,6 +282,8 @@ class Tabor_WX1284C(Instrument):
         self.get_channels_synchronised()
 
         self.get_marker_source()
+
+        self.get_channels_synchronised()
 
         for i in Channels:
             self.get('ch%d_output' % i)
@@ -1175,7 +1178,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value %s was sent to set_clock_source' % mode.upper())
             raise ValueError('The invalid value %s was sent to set_clock_source. Valid values are \'SING\' , \'DUPL\', \'ZER\' or \'COMB\'.' % mode.upper())
 
-    def set_channels_synchronised(self,synchronised='ON'):
+    def do_set_channels_synchronised(self,synchronised='ON'):
         '''
         Sets or queries the couple state of the synchronized channels. Use this command to cause all four channels
         to synchronize. Following this command, the sample clock of channel 1 will feed the other channels and
@@ -1197,7 +1200,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value %s was sent to set_channels_synchronisation' % synchronised.upper())
             raise ValueError('The invalid value %s was sent to set_channels_synchronisation. Valid values are \'ON\' or \'OFF\'.' % synchronised.upper())
 
-    def get_channels_synchronised(self):
+    def do_get_channels_synchronised(self):
         '''
         Gets the couple state of the synchronized channels.
         Input:
