@@ -115,6 +115,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('coupling', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
+        self.add_parameter('channel synchronisation', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            )
         self.add_parameter('ref_freq', type=types.IntType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             minval=10, maxval=100, units='MHz')
@@ -275,6 +278,7 @@ class Tabor_WX1284C(Instrument):
         self.get_trigger_source()
         self.get_trigger_timer_mode()
         self.get_trigger_timer_time()
+        self.get_channels_synchronised()
 
         self.get_marker_source()
 
@@ -1155,7 +1159,38 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value %s was sent to set_clock_source' % mode.upper())
             raise ValueError('The invalid value %s was sent to set_clock_source. Valid values are \'SING\' , \'DUPL\', \'ZER\' or \'COMB\'.' % mode.upper())
 
-    # Internal functions ######################################################
+    def set_channels_synchronised(self,synchronised='ON'):
+        '''
+        Sets or queries the couple state of the synchronized channels. Use this command to cause all four channels
+        to synchronize. Following this command, the sample clock of channel 1 will feed the other channels and
+        the start phase of the channels 3 and 4 channels will lock to the start phase of channels 1 and 2 waveforms.
+        Input:
+            mode (string): possible values are 'ON' or 'OFF'
+        Output:
+            none
+        '''
+        logging.info( __name__+ ': Setting the couple state of the synchronized channels')
+
+        if synchronised.upper() in ('ON', 'OFF'):
+            self._visainstrument.write('INST:COUP:STAT %s' % synchronised.upper())
+
+            if self._visainstrument.query('INST:COUP:STAT ?') != synchronised.upper():
+                logging.info('Instrument did not synchronise the channels')
+                raise ValueError('Instrument did not synchronise the channels')
+        else:
+            logging.info('The invalid value %s was sent to set_channels_synchronisation' % synchronised.upper())
+            raise ValueError('The invalid value %s was sent to set_channels_synchronisation. Valid values are \'ON\' or \'OFF\'.' % synchronised.upper())
+
+    def get_channels_synchronised(self):
+        '''
+        Gets the couple state of the synchronized channels.
+        Input:
+            NONE
+        Output:
+            (integer): returns '0' if synchronisation is OFF and '1' if synchronisation is 'ON'
+        '''
+        logging.info( __name__+ ': Getting the couple state of the synchronisation')
+        return self._visainstrument.query('INST:COUP:STAT ?')
 
     def channel_select(self,ch_id):
         """
