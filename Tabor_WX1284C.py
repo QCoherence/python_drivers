@@ -579,12 +579,12 @@ class Tabor_WX1284C(Instrument):
 
     def do_set_trigger_timer_time(self, period):
         '''
-            Use this command to set or query the delay setting of the internal delayed
-            trigger generator. This value is associated with the internal trigger run mode
-            only and has no effect on other trigger modes. The internal delayed trigger
-            generator is a free-running oscillator, asynchronous with the frequency of the
-            output waveform. The timer intervals are measured from waveform stop to waveform
-            start.
+            Use this command to set or query the period of the internal timed
+            trigger generator. This value is associated with the internal
+            trigger run mode only and has no effect on other trigger modes.
+            The internal trigger generator is a free-running oscillator,
+            asynchronous with the frequency of the output waveform. The timer
+            intervals are measured from waveform start to waveform start.
 
         Input:
             Trigger timer time (float): The period in us.
@@ -638,7 +638,7 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+' : Getting the output state of channel %s'%( channel))
 
         self.channel_select(channel)
-        self._visainstrument.query('OUTP?')
+        return self._visainstrument.query('OUTP?')
 
     def do_get_coupling(self, channel=1):
         '''
