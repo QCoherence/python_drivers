@@ -596,9 +596,7 @@ class Tabor_WX1284C(Instrument):
         logging.info( '{} : Setting the trigger timer time to {}'.format(__name__,period))
         self._visainstrument.write(':TRIG:TIM:TIME '+str(period*1e-6))
 
-        if float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6 != period:
-            print float(self._visainstrument.query(':TRIG:TIM:TIME?')), period
-            logging.info('Trigger timer time was not set properly')
+        if float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6 != period:            logging.info('Trigger timer time was not set properly')
             raise ValueError('Trigger timer time was not set properly')
 
     def do_set_output(self, state='ON', channel=1):
