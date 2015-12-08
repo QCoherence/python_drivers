@@ -263,7 +263,7 @@ class Average(DataTreatment):
         self.std  = self.std_averaging(self.std, np.std(data, axis=0))
 
         # Send the result with the amplitude in V
-        queue_treatment.put((data, self.std))
+        queue_treatment.put((self.mean, self.std))
 
 
 
@@ -650,3 +650,113 @@ class RealImagPerSequence(DataTreatment):
             self.imag_mean = imag_mean
 
             queue_treatment.put((self.real_mean, self.real_std, self.imag_mean, self.imag_std))
+
+
+
+class AmplitudeHistogram(DataTreatment):
+    """
+        Return an array of amplitude of the acquired sequences by
+        using the cos, sin method.
+        Take into account an integer number of oscillations (bigest one) for the
+        calculation.
+        Return the amplitude in V.
+    """
+
+
+    def __init__(self, acquisition_time, samplerate, frequency):
+        """
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+                - frequency (float): in hertz
+        """
+
+        # We need an integer number of oscillations
+        nb_oscillations = int(frequency*acquisition_time)
+
+        if nb_oscillations < 1:
+            raise ValueError('The number of acquired oscillations must be larger than 1')
+
+        # We obtain the number of point in these oscillations
+        self.nb_points  = int(nb_oscillations/frequency*samplerate)
+
+        # We calculate the sin and cos
+        time = np.arange(self.nb_points)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        # Data save
+        self.amp = np.array([])
+
+
+
+    def process(self, data, queue_treatment, parameters):
+
+        # We obtain the data in volt
+        data = self.data_in_volt(data)
+
+        # Build cos and sin
+        cos = np.mean(data[:,:self.nb_points]*self.cos, axis=1)
+        sin = np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+
+        # We obtain the current amplitude
+        self.amp = np.concatenate((self.amp, 2.*np.sqrt(cos**2. + sin**2.)))
+
+        # We send the result
+        queue_treatment.put((self.amp))
+
+
+
+class PhaseHistogram(DataTreatment):
+    """
+        Return an array of phase of the acquired sequences by
+        using the cos, sin method.
+        Take into account an integer number of oscillations (bigest one) for the
+        calculation.
+        Return the phase in rad.
+    """
+
+
+    def __init__(self, acquisition_time, samplerate, frequency):
+        """
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+                - frequency (float): in hertz
+        """
+
+        # We need an integer number of oscillations
+        nb_oscillations = int(frequency*acquisition_time)
+
+        if nb_oscillations < 1:
+            raise ValueError('The number of acquired oscillations must be larger than 1')
+
+        # We obtain the number of point in these oscillations
+        self.nb_points  = int(nb_oscillations/frequency*samplerate)
+
+        # We calculate the sin and cos
+        time = np.arange(self.nb_points)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        # Data save
+        self.phase = np.array([])
+
+
+
+    def process(self, data, queue_treatment, parameters):
+
+        # We obtain the data in volt
+        data = self.data_in_volt(data)
+
+        # Build cos and sin
+        cos = np.mean(data[:,:self.nb_points]*self.cos, axis=1)
+        sin = np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+
+        # We obtain the current amplitude
+        self.phase = np.concatenate((self.phase, np.angle(cos + +1j*sin)))
+
+        # We send the result
+        queue_treatment.put((self.phase))
