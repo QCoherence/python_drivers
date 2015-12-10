@@ -24,7 +24,7 @@ import numpy
 
 import qt
 
-class new_visa_HP3245A(Instrument):
+class HP3245A(Instrument):
     '''
     This is the driver for the Hewlett Packard 3245A universal source
 
