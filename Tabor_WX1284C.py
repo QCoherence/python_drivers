@@ -94,7 +94,20 @@ class Tabor_WX1284C(Instrument):
         # Add parameters ######################################################
         self.add_parameter('func_mode', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('run_mode', type=types.StringType,
+            option_list=['CONT', 'TRIG', 'GATE'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_source', type=types.StringType,
+            option_list=['EXT', 'BUS', 'TIM', 'EVEN'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('trigger_mode', type=types.StringType,
+            option_list=['NORM', 'OVER'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_timer_mode', type=types.StringType,
+            option_list=['TIME', 'DEL'],
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('trigger_timer_time', type=types.FloatType,
+            minval = 0.2, maxval=20e6, units='us',
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
         self.add_parameter('output', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
@@ -102,6 +115,10 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('coupling', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4),channel_prefix='ch%d_')
+        self.add_parameter('channels_synchronised', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            option_list=['ON', 'OFF']
+            )
         self.add_parameter('ref_freq', type=types.IntType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             minval=10, maxval=100, units='MHz')
@@ -123,6 +140,9 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('trigger_level', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             minval=-5, maxval=5, units='Volts')
+        self.add_parameter('marker_source', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            option_list=['WAVE', 'USER'])
         self.add_parameter('marker_status_1_2', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1,2), channel_prefix='m%d_')
@@ -158,8 +178,8 @@ class Tabor_WX1284C(Instrument):
         if reset:
             self.reset()
             self.clear_err()
-        else:
-            self.get_all()
+
+        self.get_all()
 
     # Functions ###############################################################
     def clean_visa_open(self):
@@ -244,13 +264,26 @@ class Tabor_WX1284C(Instrument):
         logging.info(__name__ + ' : Reading all data from instrument')
 
         self.get_func_mode()
-        self.get_trigger_mode()
+        self.get_run_mode()
+        self.get_trace_mode()
+
         self.get_ref_source()
         self.get_ref_freq()
+
+
         self.get_clock_source()
         self.get_clock_freq()
+
         self.get_trigger_level()
-        self.get_trace_mode()
+        self.get_trigger_mode()
+        self.get_trigger_source()
+        self.get_trigger_timer_mode()
+        self.get_trigger_timer_time()
+        self.get_channels_synchronised()
+
+        self.get_marker_source()
+
+        self.get_channels_synchronised()
 
         for i in Channels:
             self.get('ch%d_output' % i)
@@ -261,8 +294,8 @@ class Tabor_WX1284C(Instrument):
         for i in Mark_num:
             self.get('m%d_marker_status_1_2' % i)
             self.get('m%d_marker_status_3_4' % i)
-            self.get('m%d_marker_high_1_2' % i)
-            self.get('m%d_marker_high_3_4' % i)
+            # self.get('m%d_marker_high_1_2' % i)
+            # self.get('m%d_marker_high_3_4' % i)
 
     def init_channel(self,channel=1):
         '''
@@ -365,9 +398,9 @@ class Tabor_WX1284C(Instrument):
 
             raise ValueError('The invalid value {} was sent to func_mode method. Valid values are \'FIX\',\'USER\',\'SEQ\',\'ASEQ\',\'MOD\',\'PULS\',\'PATT\'.'.format(value))
 
-    def do_get_trigger_mode(self):
+    def do_get_run_mode(self):
         '''
-        Gets the trigger mode of the instrument
+        Gets the run mode of the instrument
 
         Input:
             None
@@ -375,7 +408,7 @@ class Tabor_WX1284C(Instrument):
         Output:
             Trigger mode (string): 'CONT', 'TRIG', 'GATE' depending on the mode
         '''
-        logging.info( '{} : Getting the trigger mode'.format(__name__))
+        logging.info( '{} : Getting the run mode'.format(__name__))
         if self._visainstrument.query('INIT:CONT?') == 'ON':
             return 'CONT'
         elif self._visainstrument.query('INIT:GATE?') == 'ON':
@@ -383,9 +416,9 @@ class Tabor_WX1284C(Instrument):
         else:
             return 'TRIG'
 
-    def do_set_trigger_mode(self, value='TRIG'):
+    def do_set_run_mode(self, value='TRIG'):
         '''
-        Sets the trigger mode of the instrument
+        Sets the run mode of the instrument
 
         Input:
             Trigger mode (string): 'CONT', 'TRIG', 'GATE' depending on the mode
@@ -393,43 +426,180 @@ class Tabor_WX1284C(Instrument):
         Output:
             None
         '''
-        logging.info( '{} : Setting the trigger mode to {}'.format(__name__,value))
+        logging.info( '{} : Setting the run mode to {}'.format(__name__,value))
         if value.upper() == 'CONT':
             self._visainstrument.write('INIT:CONT ON')
             if self._visainstrument.query('INIT:CONT?') != 'ON':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
         elif value.upper() == 'TRIG':
             self._visainstrument.write('INIT:CONT OFF')
-            self._visainstrument.write('INIT:GATE OFF')
+            # self._visainstrument.write('INIT:GATE OFF')
             if self._visainstrument.query('INIT:CONT?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
-            elif self._visainstrument.query('INIT:GATE?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
+                logging.info('Run mode wasn\'t set properly')
+            # elif self._visainstrument.query('INIT:GATE?') != 'OFF':
+            #     logging.info('Run mode wasn\'t set properly')
         elif value.upper() == 'GATE':
-            self._visainstrument.write('INIT:CONT OFF')
+            # self._visainstrument.write('INIT:CONT OFF')
             self._visainstrument.write('INIT:GATE ON')
-            if self._visainstrument.query('INIT:CONT?') != 'OFF':
-                logging.info('Trigger mode wasn\'t set properly')
-            elif self._visainstrument.query('INIT:GATE?') != 'ON':
-                logging.info('Trigger mode wasn\'t set properly')
+            # if self._visainstrument.query('INIT:CONT?') != 'OFF':
+            #     logging.info('Run mode wasn\'t set properly')
+            if self._visainstrument.query('INIT:GATE?') != 'ON':
+                logging.info('Run mode wasn\'t set properly')
         else:
-            logging.info('The invalid value {} was sent to set_trigger_mode method'.format(value))
-            raise ValueError('The invalid value {} was sent to set_trigger_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
+            logging.info('The invalid value {} was sent to set_run_mode method'.format(value))
+            raise ValueError('The invalid value {} was sent to set_run_mode method. Valid values are \'CONT\', \'TRIG\', \'GATE\'.'.format(value))
 
-    def do_get_output(self, channel=1):
+    def do_get_trigger_source(self):
         '''
-        Gets the state of a given channel: ON or OFF
+        Get the trigger source of the instrument
 
         Input:
-            channel (string): Channel ID
+            None
 
         Output:
-            Output state (string): 'ON' or 'OFF'
+            Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
         '''
-        logging.info( __name__+ ': Getting the output state of channel %s' % channel)
 
-        self.channel_select(channel)
-        return self._visainstrument.query('OUTP?')
+        logging.info( '{} : Getting the trigger source')
+        return self._visainstrument.query(':TRIG:SOUR:ADV?')
+
+    def do_set_trigger_source(self, value='TIM'):
+        '''
+            Use this command to set or query the source of the trigger event
+            that will stimulate the WX2184C to generate waveforms. The source
+            advance command will affect the generator only after it has been
+            programmed to operate in trigger run mode. Modify the WX2184C to
+            trigger run mode using the init:cont off
+            command.
+
+        Input:
+            Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger source to {}'.format(__name__,value))
+        self._visainstrument.write(':TRIG:SOUR:ADV '+str(value.upper()))
+
+        if self._visainstrument.query(':TRIG:SOUR:ADV?') != value.upper():
+
+            logging.info('Trigger source was not set properly')
+            raise ValueError('Trigger source was not set properly')
+
+    def do_get_trigger_mode(self):
+        '''
+        Get the trigger mode of the instrument
+
+        Input:
+            None
+
+        Output:
+            Trigger mode (string): 'NORM', 'OVER'.
+        '''
+
+        logging.info( '{} : Getting the trigger mode')
+        return self._visainstrument.query(':TRIG:MODE?')
+
+    def do_set_trigger_mode(self, value='NORM'):
+        '''
+            Use this command to define or query the trigger mode. In normal mode,
+            the first trigger activates the output and consecutive triggers are
+            ignored for the duration of the output waveform. In override mode,
+            the first trigger activates the output and consecutive triggers
+            restart the output waveform, regardless if the current waveform has
+            been completed or not.
+
+        Input:
+            Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger mode to {}'.format(__name__,value))
+        self._visainstrument.write(':TRIG:MODE '+str(value.upper()))
+
+        if self._visainstrument.query(':TRIG:MODE?') != value.upper():
+
+            logging.info('Trigger mode was not set properly')
+            raise ValueError('Trigger mode was not set properly')
+
+    def do_get_trigger_timer_mode(self):
+        '''
+        Get the trigger timer mode of the instrument
+
+        Input:
+            None
+
+        Output:
+            Trigger mode (string): 'TIME', 'DEL'.
+        '''
+
+        logging.info( '{} : Getting the trigger timer mode')
+        return self._visainstrument.query(':TRIG:TIM:MODE?')
+
+    def do_set_trigger_timer_mode(self, value='TIME'):
+        '''
+            Use this command to set or query the mode that the internal trigger
+            generator will operate. Timed defines start-to-start triggers and
+            Delayed defines end-to-start triggers. The timer commands will
+            affect the generator only after it has been programmed to operate
+            in timer mode. Modify the WX2184C to trigger run mode using the
+            init:cont off command and program the internal timer using the
+            trig:tim command.
+
+        Input:
+            Trigger source (string): 'TIME', 'DEL'.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger timer mode to {}'.format(__name__,value))
+        self._visainstrument.write(':TRIG:TIM:MODE '+str(value.upper()))
+
+        if self._visainstrument.query(':TRIG:TIM:MODE?') != value.upper():
+
+            logging.info('Trigger timer mode was not set properly')
+            raise ValueError('Trigger timer mode was not set properly')
+
+    def do_get_trigger_timer_time(self):
+        '''
+        Get the trigger timer time of the instrument
+
+        Input:
+            None
+
+        Output:
+            Trigger timer time (float): The period in us.
+        '''
+
+        logging.info( '{} : Getting the trigger timer time')
+        return float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6
+
+    def do_set_trigger_timer_time(self, period):
+        '''
+            Use this command to set or query the period of the internal timed
+            trigger generator. This value is associated with the internal
+            trigger run mode only and has no effect on other trigger modes.
+            The internal trigger generator is a free-running oscillator,
+            asynchronous with the frequency of the output waveform. The timer
+            intervals are measured from waveform start to waveform start.
+
+        Input:
+            Trigger timer time (float): The period in us.
+
+        Output:
+            None
+        '''
+
+        logging.info( '{} : Setting the trigger timer time to {}'.format(__name__,period))
+        self._visainstrument.write(':TRIG:TIM:TIME '+str(period*1e-6))
+
+        if float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6 != period:
+            logging.info('Trigger timer time was not set properly')
+            raise ValueError('Trigger timer time was not set properly')
 
     def do_set_output(self, state='ON', channel=1):
         '''
@@ -453,6 +623,22 @@ class Tabor_WX1284C(Instrument):
         else:
             logging.info('The invalid state {} was sent to set_output'.format(state))
             raise ValueError('The invalid state {} was sent to set_output. Valid values are \'ON\' or \'OFF\'.'.format(state))
+
+    def do_get_output(self, channel=1):
+        '''
+        Get the state of a given channel
+
+        Input:
+            channel (int): Channel ID
+
+        Output:
+            state (string): 'ON' or 'OFF'
+        '''
+
+        logging.info( __name__+' : Getting the output state of channel %s'%( channel))
+
+        self.channel_select(channel)
+        return self._visainstrument.query('OUTP?')
 
     def do_get_coupling(self, channel=1):
         '''
@@ -713,6 +899,40 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Getting the trigger level.' )
         return self._visainstrument.query('TRIG:LEV ?')
 
+    def do_set_marker_source(self, source='WAVE'):
+        '''
+        Use this command to set or query the source of the marker data. The
+        WAVE marker data is a single marker transition with a varying position
+        and width, similar to a SYNC output. The USER marker data enables the
+        user to program multiple marker transition, similar to a separate data
+        line, for example a clock. The USER data can only be programmed via a
+        remote interface. The marker width (or length) is limited to the
+        relevant segment length and has a resolution of 2.
+
+        Input:
+            source (string): 'WAVE', 'USER'
+        Output:
+            None
+        '''
+        logging.info( __name__+ ': Setting the marker source to %s.' % source)
+        self._visainstrument.write('MARK:SOUR %s' % source)
+
+        if self._visainstrument.query('MARK:SOUR?') != source.upper():
+            logging.info('The marker source wasn\'t set properly')
+            raise ValueError('The marker source wasn\'t set properly to set_marker_source. Valid value are \'WAVE\', \'USER\'.')
+
+    def do_get_marker_source(self):
+        '''
+        Gets the marker source.
+
+        Input:
+            None
+        Output:
+            source (string): 'WAVE', 'USER'
+        '''
+        logging.info( __name__+ ': Getting the marker source.' )
+        return self._visainstrument.query('MARK:SOUR?')
+
     def do_get_marker_status_1_2(self, channel=1):
         '''
         Gets the status of the marker number "channel" of the channel 1 or 2.
@@ -869,7 +1089,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('Wrong number of the channel for the marker. Valid values are 1,2.')
 
         self._visainstrument.write('MARK:VOLT:HIGH %s' % high_level)
-        if self._visainstrument.query('MARK:VOLT:HIGH ?') != high_level:
+        if self._visainstrument.query('MARK:VOLT:HIGH?') != high_level:
             logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
             raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
 
@@ -958,7 +1178,38 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value %s was sent to set_clock_source' % mode.upper())
             raise ValueError('The invalid value %s was sent to set_clock_source. Valid values are \'SING\' , \'DUPL\', \'ZER\' or \'COMB\'.' % mode.upper())
 
-    # Internal functions ######################################################
+    def do_set_channels_synchronised(self,synchronised='ON'):
+        '''
+        Sets or queries the couple state of the synchronized channels. Use this command to cause all four channels
+        to synchronize. Following this command, the sample clock of channel 1 will feed the other channels and
+        the start phase of the channels 3 and 4 channels will lock to the start phase of channels 1 and 2 waveforms.
+        Input:
+            mode (string): possible values are 'ON' or 'OFF'
+        Output:
+            none
+        '''
+        logging.info( __name__+ ': Setting the couple state of the synchronized channels')
+
+        if synchronised.upper() in ('ON', 'OFF'):
+            self._visainstrument.write('INST:COUP:STAT %s' % synchronised.upper())
+
+            if self._visainstrument.query('INST:COUP:STAT ?') != synchronised.upper():
+                logging.info('Instrument did not synchronise the channels')
+                raise ValueError('Instrument did not synchronise the channels')
+        else:
+            logging.info('The invalid value %s was sent to set_channels_synchronisation' % synchronised.upper())
+            raise ValueError('The invalid value %s was sent to set_channels_synchronisation. Valid values are \'ON\' or \'OFF\'.' % synchronised.upper())
+
+    def do_get_channels_synchronised(self):
+        '''
+        Gets the couple state of the synchronized channels.
+        Input:
+            NONE
+        Output:
+            (integer): returns '0' if synchronisation is OFF and '1' if synchronisation is 'ON'
+        '''
+        logging.info( __name__+ ': Getting the couple state of the synchronisation')
+        return self._visainstrument.query('INST:COUP:STAT ?')
 
     def channel_select(self,ch_id):
         """
@@ -1093,13 +1344,13 @@ class Tabor_WX1284C(Instrument):
         intrv_end = intrv_start + intrv_len
 
         if intrv_start >= 0 and intrv_end <= self.period_len:
-            if self.is_for_trigger_mode:
+            if self.is_for_run_mode:
                 return [(intrv_start, intrv_len)]
             else:
                 return [(intrv_start + i * self.period_len, intrv_len)
                         for i in range(self.num_periods)]
 
-        if self.is_for_trigger_mode:
+        if self.is_for_run_mode:
             intrv_start = max(intrv_start, Decimal(0))
             intrv_end = min(intrv_end, self.period_len * self.num_periods)
             if intrv_end <= intrv_start:
@@ -1260,6 +1511,23 @@ class Tabor_WX1284C(Instrument):
                 print('''Instrument did not set correctly the sequence mode''')
         else:
             print('''The invalid value {} was sent to seq_mode method''').format(value)
+
+    def get_seq_mode(self):
+        """
+        Gets Sequence mode setter method.
+
+        Input:
+            None
+
+        Output:
+            Function mode (string) : 'AUTO','ONCE' or 'STEP' depending on the mode
+        """
+
+        logging.info( __name__+' : Getting the sequence mode setter method')
+
+
+        return self._visainstrument.query('SEQ:ADV?')
+
 
     def seq_jump_source(self,value='BUS'):
         """

@@ -64,7 +64,7 @@ class Keithley_2400(Instrument):
         # Initialize wrapper functions
         logging.info('Initializing instrument Keithley_2400')
         Instrument.__init__(self, name, tags=['physical'])
-        rm = visa.ResourceManager
+        rm = visa.ResourceManager()
 
         # Add some global constants
         self._address = address

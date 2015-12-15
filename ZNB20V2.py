@@ -48,12 +48,15 @@ class ZNB20V2(Instrument):
         logging.debug(__name__ + ' : Initializing instrument')
 
         Instrument.__init__(self, name, tags=['physical'])
-        rm = visa.ResourceManager
+        rm = visa.ResourceManager()
+
+        self._address = address
 
         try:
             self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
+
         self._visainstrument.write_termination = '\n'
         self._visainstrument.read_termination = '\n'
 
