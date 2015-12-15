@@ -243,15 +243,14 @@ class Average(DataTreatment):
 
     def __init__(self):
 
-        self.mean = 0.
-        self.std  = 0.
+        self.data = 0.
 
     def process(self, data, queue_treatment, parameters):
         """
             Calculate the average of the current buffer and average it with
             the previous measured data.
             Return the data in the memory buffer as the following:
-            (data, std)
+            (data)
         """
 
         # We obtain the data in volt
@@ -259,11 +258,12 @@ class Average(DataTreatment):
 
         # We obtain the current averaging for both and save them for
         # the next iteration
-        self.mean = self.mean_averaging(self.mean, np.mean(data, axis=0))
-        self.std  = self.std_averaging(self.std, np.std(data, axis=0))
+        self.data = self.mean_averaging(self.data, np.mean(data, axis=0))
+        # self.std  = self.std_averaging(self.std, np.std(data, axis=0))
 
         # Send the result with the amplitude in V
-        queue_treatment.put((self.mean, self.std))
+        # queue_treatment.put((data))
+        queue_treatment.put((self.data))
 
 
 
@@ -321,6 +321,75 @@ class AmplitudePhase(DataTreatment):
         # Build cos and sin
         cos = np.mean(data[:,:self.nb_points]*self.cos, axis=1)
         sin = np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+
+        # Obtain amplitude and phase
+        amp   = 2.*np.sqrt(cos**2. + sin**2.)
+        phase = np.angle(cos + 1j*sin)
+
+        # We obtain the current averaging for both and save them for
+        # the next iteration
+        self.amp_mean = self.mean_averaging(self.amp_mean, np.mean(amp, axis=0))
+        self.amp_std  = self.std_averaging(self.amp_std, np.std(amp, axis=0))
+
+        self.phase_mean = self.mean_averaging(self.phase_mean, np.mean(phase, axis=0))
+        self.phase_std  = self.std_averaging(self.phase_std, np.std(phase, axis=0))
+
+        # We send the result
+        queue_treatment.put((self.amp_mean, self.amp_std,\
+                             self.phase_mean, self.phase_std))
+
+
+
+class AmplitudePhaseMarker(DataTreatment):
+    """
+        Return the amplitude and the phase of the acquired oscillations by
+        using the cos, sin method.
+        Return the amplitude in V and the phase in rad
+    """
+
+
+
+    def __init__(self, samplerate, frequency, start, stop):
+        """
+            Input:
+                - samplerate (float): in sample per second
+                - frequency (float): Frequency of the down-converted signal in hertz
+                - start (float): time from which data are meaningfull in second
+                - stop (float):  time to which data stop to be meaningfull in second
+        """
+
+        # Find start and stop in array index
+        self.start = int(round(start*samplerate, 0))
+        self.stop  = int(round(stop*samplerate, 0))
+
+        # We calculate the sin and cos
+        time = np.arange(self.stop - self.start)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        # Data save
+        self.amp_mean = 0.
+        self.amp_std  = 0.
+        self.phase_mean = 0.
+        self.phase_std  = 0.
+
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the amplitude and the phase of the acquired oscillations by
+            using the cos, sin method.
+            Return the amplitude in V and the phase in rad as
+            (amp_mean, amp_std, phase_mean, phase_std)
+        """
+
+        # We obtain the data in volt
+        data = self.data_in_volt(data)
+
+        # Build cos and sin
+        cos = np.mean(data[:,self.start:self.stop]*self.cos, axis=1)
+        sin = np.mean(data[:,self.start:self.stop]*self.sin, axis=1)
 
         # Obtain amplitude and phase
         amp   = 2.*np.sqrt(cos**2. + sin**2.)
@@ -428,6 +497,96 @@ class DBPhase(DataTreatment):
         self.phase_mean = self.mean_averaging(self.phase_mean, np.mean(phase, axis=0))
         self.phase_std  = self.std_averaging(self.phase_std, np.std(phase, axis=0))
 
+        queue_treatment.put((20.*np.log10(self.amp_mean/self.input_amplitude),\
+                             20.*self.amp_std/self.amp_mean/np.log(10.),\
+                             self.phase_mean, self.phase_std))
+
+
+
+class DBPhaseMarker(DataTreatment):
+    """
+        Return the amplitude and the phase of the acquired oscillations by
+        using the cos, sin method.
+        Return the amplitude in V and the phase in rad
+    """
+
+
+
+    def __init__(self, samplerate, frequency, start, stop, input_power,
+                 impedance = 50):
+        """
+            Input:
+                - samplerate (float): in sample per second
+                - frequency (float): Frequency of the down-converted signal in hertz
+                - start (float): time from which data are meaningfull in second
+                - stop (float):  time to which data stop to be meaningfull in second
+                - input_power (float): in dBm
+                - impedance (float): by default 50 ohm
+        """
+
+        # Find start and stop in array index
+        self.start = int(round(start*samplerate, 0))
+        self.stop  = int(round(stop*samplerate, 0))
+
+        # We calculate the sin and cos
+        time = np.arange(self.stop - self.start)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        # Data save
+        self.amp_mean = 0.
+        self.amp_std  = 0.
+        self.phase_mean = 0.
+        self.phase_std  = 0.
+
+        self.impedance = impedance
+
+        # We save the input power in V
+        self.set_input_power(input_power)
+
+
+
+    def set_input_power(self, input_power):
+        """
+            Set the input power.
+            Input:
+                - input_power (float): in dBm
+        """
+
+        # We save the input power in V
+        self.input_amplitude = np.sqrt(1e-3*10**(input_power/10.)\
+                                       *self.impedance)
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the amplitude and the phase of the acquired oscillations by
+            using the cos, sin method.
+            Return the amplitude in V and the phase in rad as
+            (amp_mean, amp_std, phase_mean, phase_std)
+        """
+
+        # We obtain the data in volt
+        data = self.data_in_volt(data)
+
+        # Build cos and sin
+        cos = np.mean(data[:,self.start:self.stop]*self.cos, axis=1)
+        sin = np.mean(data[:,self.start:self.stop]*self.sin, axis=1)
+
+        # Obtain amplitude and phase
+        amp   = 2.*np.sqrt(cos**2. + sin**2.)
+        phase = np.angle(cos + 1j*sin)
+
+        # We obtain the current averaging for both and save them for
+        # the next iteration
+        self.amp_mean = self.mean_averaging(self.amp_mean, np.mean(amp, axis=0))
+        self.amp_std  = self.std_averaging(self.amp_std, np.std(amp, axis=0))
+
+        self.phase_mean = self.mean_averaging(self.phase_mean, np.mean(phase, axis=0))
+        self.phase_std  = self.std_averaging(self.phase_std, np.std(phase, axis=0))
+
+        # We send the result
         queue_treatment.put((20.*np.log10(self.amp_mean/self.input_amplitude),\
                              20.*self.amp_std/self.amp_mean/np.log(10.),\
                              self.phase_mean, self.phase_std))
