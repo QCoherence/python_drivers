@@ -433,17 +433,17 @@ class Tabor_WX1284C(Instrument):
                 logging.info('Run mode wasn\'t set properly')
         elif value.upper() == 'TRIG':
             self._visainstrument.write('INIT:CONT OFF')
-            self._visainstrument.write('INIT:GATE OFF')
+            # self._visainstrument.write('INIT:GATE OFF')
             if self._visainstrument.query('INIT:CONT?') != 'OFF':
                 logging.info('Run mode wasn\'t set properly')
-            elif self._visainstrument.query('INIT:GATE?') != 'OFF':
-                logging.info('Run mode wasn\'t set properly')
+            # elif self._visainstrument.query('INIT:GATE?') != 'OFF':
+            #     logging.info('Run mode wasn\'t set properly')
         elif value.upper() == 'GATE':
-            self._visainstrument.write('INIT:CONT OFF')
+            # self._visainstrument.write('INIT:CONT OFF')
             self._visainstrument.write('INIT:GATE ON')
-            if self._visainstrument.query('INIT:CONT?') != 'OFF':
-                logging.info('Run mode wasn\'t set properly')
-            elif self._visainstrument.query('INIT:GATE?') != 'ON':
+            # if self._visainstrument.query('INIT:CONT?') != 'OFF':
+            #     logging.info('Run mode wasn\'t set properly')
+            if self._visainstrument.query('INIT:GATE?') != 'ON':
                 logging.info('Run mode wasn\'t set properly')
         else:
             logging.info('The invalid value {} was sent to set_run_mode method'.format(value))
@@ -469,7 +469,8 @@ class Tabor_WX1284C(Instrument):
             that will stimulate the WX2184C to generate waveforms. The source
             advance command will affect the generator only after it has been
             programmed to operate in trigger run mode. Modify the WX2184C to
-            trigger run mode using the init:cont off command.
+            trigger run mode using the init:cont off
+            command.
 
         Input:
             Trigger source (string): 'EXT', 'BUS', 'TIM', 'EVEN'.
@@ -1510,6 +1511,23 @@ class Tabor_WX1284C(Instrument):
                 print('''Instrument did not set correctly the sequence mode''')
         else:
             print('''The invalid value {} was sent to seq_mode method''').format(value)
+
+    def get_seq_mode(self):
+        """
+        Gets Sequence mode setter method.
+
+        Input:
+            None
+
+        Output:
+            Function mode (string) : 'AUTO','ONCE' or 'STEP' depending on the mode
+        """
+
+        logging.info( __name__+' : Getting the sequence mode setter method')
+
+
+        return self._visainstrument.query('SEQ:ADV?')
+
 
     def seq_jump_source(self,value='BUS'):
         """
