@@ -46,12 +46,10 @@ class ZNB20V2(Instrument):
             None
         '''
         logging.debug(__name__ + ' : Initializing instrument')
-
         Instrument.__init__(self, name, tags=['physical'])
-        rm = visa.ResourceManager
+        rm = visa.ResourceManager()
 
         self._address = address
-
         try:
             self._visainstrument = rm.open_resource(self._address)
         except:
@@ -368,7 +366,7 @@ class ZNB20V2(Instrument):
             self._visainstrument.write("TRIG:LINK '"+str(link.upper())+"'")
         else:
             raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPO')
-	
+
     def set_sweeptype(self, sweeptype='LIN'):
         '''
     	Define the type of the sweep: LINear | LOGarithmic | POWer | CW | POINt | SEGMent

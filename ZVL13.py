@@ -48,7 +48,7 @@ class ZVL13(Instrument):
         '''
         logging.debug(__name__ + ' : Initializing instrument')
         Instrument.__init__(self, name, tags=['physical'])
-        rm = visa.ResourceManager
+        rm = visa.ResourceManager()
 
         self._address = address
         try:
