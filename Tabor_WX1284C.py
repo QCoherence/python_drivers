@@ -832,13 +832,13 @@ class Tabor_WX1284C(Instrument):
 
         self.channel_select(channel)
         if amp > 2:
-            self.do_set_coupling('HV')
+            self.do_set_coupling('HV', channel)
 
-        if self.do_get_coupling() == 'DC':
+        if self.do_get_coupling(channel) == 'DC':
             self._visainstrument.write('VOLT:AMPL %s'% amp)
             if self._visainstrument.query('VOLT:AMPL ?') != amp:
                 logging.info('The amplitude wasn\'t set properly')
-        elif self.do_get_coupling() == 'HV':
+        elif self.do_get_coupling(channel) == 'HV':
             self._visainstrument.write('VOLT:AMPL:HV %s'% amp)
             if self._visainstrument.query('VOLT:AMPL:HV ?') != amp:
                 logging.info('The amplitude wasn\'t set properly')
@@ -856,9 +856,9 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
         self.channel_select(channel)
-        if self.do_get_coupling() == 'DC':
+        if self.do_get_coupling(channel) == 'DC':
             return self._visainstrument.query('VOLT:AMPL ?')
-        if self.do_get_coupling() == 'HV':
+        if self.do_get_coupling(channel) == 'HV':
             return self._visainstrument.query('VOLT:AMPL:HV ?')
 
     def do_set_offset(self, offset, channel=1):
