@@ -133,7 +133,7 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('amplitude', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
-            minval=0.05, maxval=2, units='Volts')
+            minval=0.05, maxval=4, units='Volts')
         self.add_parameter('offset', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
@@ -820,6 +820,8 @@ class Tabor_WX1284C(Instrument):
     def do_set_amplitude(self, amp, channel=1):
         '''
         Sets the amplitude of the channel.
+        In 'DC' mode, the amplitude should be between 0.05 and 2 V.
+        In 'HV' mode, the amplitude should be between 0.05 and 4 V? #to be verified
         Input:
             amp (float): amplitude of the channel in [V]
         Output:
@@ -829,9 +831,19 @@ class Tabor_WX1284C(Instrument):
 
 
         self.channel_select(channel)
-        self._visainstrument.write('VOLT:AMPL %s'% amp)
-        if self._visainstrument.query('VOLT:AMPL ?') != amp:
-            logging.info('The amplitude wasn\'t set properly')
+        if amp > 2:
+            self.do_set_coupling('HV')
+
+        if self.do_get_coupling() == 'DC':
+            self._visainstrument.write('VOLT:AMPL %s'% amp)
+            if self._visainstrument.query('VOLT:AMPL ?') != amp:
+                logging.info('The amplitude wasn\'t set properly')
+        elif self.do_get_coupling() == 'HV':
+            self._visainstrument.write('VOLT:AMPL:HV %s'% amp)
+            if self._visainstrument.query('VOLT:AMPL:HV ?') != amp:
+                logging.info('The amplitude wasn\'t set properly')
+        else:
+            logging.info('There is a problem with the coupling mode.')
 
     def do_get_amplitude(self, channel=1):
         '''
@@ -843,10 +855,11 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
-
-
         self.channel_select(channel)
-        return self._visainstrument.query('VOLT:AMPL ?')
+        if self.do_get_coupling() == 'DC':
+            return self._visainstrument.query('VOLT:AMPL ?')
+        if self.do_get_coupling() == 'HV':
+            return self._visainstrument.query('VOLT:AMPL:HV ?')
 
     def do_set_offset(self, offset, channel=1):
         '''
