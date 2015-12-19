@@ -1,6 +1,7 @@
-# Tektronix_AWG5014.py class
+# Tabor_WX1284C.py class
 #
 # Nicolas Roch <nicolas.roch@neel.cnrs.fr>, 2015
+# Remy Dassonneville <remy.dassonneville@neel.cnrs.fr>, 2015
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,7 +26,7 @@ import struct
 import pyvisa.constants as vc
 import ctypes
 
-################### Constants
+################### Constants ##################################################
 
 MARKER_QUANTUM = 2        #: quantum of marker-length and marker-offset
 _EX_DAT_MARKER_1_MASK = 0x20000000L #: the mask of marker 1 in the extra-data (32-bits) value
@@ -37,6 +38,7 @@ number_of_bits = 16
 
 Channels=(1,2,3,4)
 Mark_num = (1,2)
+
 ###### Useful functions
 def _engineer_to_scienc(value):
         '''
@@ -64,14 +66,13 @@ class Tabor_WX1284C(Instrument):
 
     TODO:
     complete the driver
-    write a cleaner version of 'init_channel'
+    write a cleaner version of 'init_channel' -> done?
     make the string formatting uniform
     '''
 
     def __init__(self, name, address, reset=False):
         '''
-        Initializes the AWG520.
-
+        Initializes the Tabor_WX1284C.
         Input:
             name (string)    : name of the instrument
             address (string) :  address
@@ -132,7 +133,7 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('amplitude', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
-            minval=0.05, maxval=2, units='Volts')
+            minval=0.05, maxval=4, units='Volts')
         self.add_parameter('offset', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
@@ -294,8 +295,9 @@ class Tabor_WX1284C(Instrument):
         for i in Mark_num:
             self.get('m%d_marker_status_1_2' % i)
             self.get('m%d_marker_status_3_4' % i)
-            # self.get('m%d_marker_high_1_2' % i)
-            # self.get('m%d_marker_high_3_4' % i)
+            self.get('m%d_marker_high_1_2' % i)
+            self.get('m%d_marker_high_3_4' % i)
+
 
     def init_channel(self,channel=1):
         '''
@@ -349,7 +351,8 @@ class Tabor_WX1284C(Instrument):
 
     def send_waveform(self, buffer, ch_id, seg_id):
         '''
-        Sets the active waveform segment seg_id at the output connector ch_id and then download the waveform data buffer to the WX2184C waveform memory.
+        Sets the active waveform segment seg_id at the output connector ch_id
+        and then download the waveform data buffer to the WX2184C waveform memory.
         Inputs:
             buffer: the binary data buffer.
             ch_id (int): channel index. Valid values are 1, 2, 3 and 4.
@@ -364,7 +367,8 @@ class Tabor_WX1284C(Instrument):
         err_code = self.download_binary_data(":TRAC:DATA",  buffer, len(buffer) * buffer.itemsize)
         return err_code
 
-    #Parameters ###############################################################
+
+    # Parameters ###############################################################
     def do_get_func_mode(self):
         '''
         Gets the function mode of the instrument
@@ -624,6 +628,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid state {} was sent to set_output'.format(state))
             raise ValueError('The invalid state {} was sent to set_output. Valid values are \'ON\' or \'OFF\'.'.format(state))
 
+
     def do_get_output(self, channel=1):
         '''
         Get the state of a given channel
@@ -815,6 +820,8 @@ class Tabor_WX1284C(Instrument):
     def do_set_amplitude(self, amp, channel=1):
         '''
         Sets the amplitude of the channel.
+        In 'DC' mode, the amplitude should be between 0.05 and 2 V.
+        In 'HV' mode, the amplitude should be between 0.05 and 4 V? #to be verified
         Input:
             amp (float): amplitude of the channel in [V]
         Output:
@@ -824,9 +831,19 @@ class Tabor_WX1284C(Instrument):
 
 
         self.channel_select(channel)
-        self._visainstrument.write('VOLT:AMPL %s'% amp)
-        if self._visainstrument.query('VOLT:AMPL ?') != amp:
-            logging.info('The amplitude wasn\'t set properly')
+        if amp > 2:
+            self.do_set_coupling('HV', channel)
+
+        if self.do_get_coupling(channel) == 'DC':
+            self._visainstrument.write('VOLT:AMPL %s'% amp)
+            if self._visainstrument.query('VOLT:AMPL ?') != amp:
+                logging.info('The amplitude wasn\'t set properly')
+        elif self.do_get_coupling(channel) == 'HV':
+            self._visainstrument.write('VOLT:AMPL:HV %s'% amp)
+            if self._visainstrument.query('VOLT:AMPL:HV ?') != amp:
+                logging.info('The amplitude wasn\'t set properly')
+        else:
+            logging.info('There is a problem with the coupling mode.')
 
     def do_get_amplitude(self, channel=1):
         '''
@@ -838,10 +855,11 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Getting the amplitude of channel %s' % channel)
 
-
-
         self.channel_select(channel)
-        return self._visainstrument.query('VOLT:AMPL ?')
+        if self.do_get_coupling(channel) == 'DC':
+            return self._visainstrument.query('VOLT:AMPL ?')
+        if self.do_get_coupling(channel) == 'HV':
+            return self._visainstrument.query('VOLT:AMPL:HV ?')
 
     def do_set_offset(self, offset, channel=1):
         '''
@@ -883,6 +901,7 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Setting the trigger level to %s.' % trig_val)
         self._visainstrument.write('TRIG:LEV %s' % trig_val)
+
 
         if float(self._visainstrument.query('TRIG:LEV ?')) != trig_val:
             logging.info('The trigger level wasn\'t set properly')

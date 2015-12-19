@@ -46,12 +46,10 @@ class ZNB20V2(Instrument):
             None
         '''
         logging.debug(__name__ + ' : Initializing instrument')
-
         Instrument.__init__(self, name, tags=['physical'])
         rm = visa.ResourceManager()
 
         self._address = address
-
         try:
             self._visainstrument = rm.open_resource(self._address)
         except:
