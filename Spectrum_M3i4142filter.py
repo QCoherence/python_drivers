@@ -622,6 +622,60 @@ class Spectrum_M3i4142filter(Instrument):
         self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_CH_ANDMASK0,    0);
         self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_CH_ANDMASK1,    0);
 
+    def init_channel01_multiple_recording_FIFO(self, nums=128, segsize=2048, posttrigger=1024, amp0=500, offs0=0, amp1=500, offs1=0):
+        '''
+        Initiates the card in:
+            Standard Multiple Recording mode
+            Using Channel 0 and 1
+            Trigger on ext0, positive slope, 50 Ohm
+
+        Sample rate is left unchanged (default for using two channels is 250 MHz).
+
+        Input:
+            nums (int)      : number of consequtive measurements
+                                default = 128
+            segsize (int)   : number of datapoints that are read out in one shot
+                                default = 2048
+            posttrigger(int): number of datapoints taken after the trigger
+                                default = 1024
+            amp (int)       : half of the range in millivolts
+                                default = 500
+
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : Initialing card for default multiple shot readout')
+
+        # memsize = nums*segsize # Note: memsize is defined per channel
+        # in FIFO, it seems we do not define memsize but a number of loops
+
+#        self.set_samplerate(rate)
+        self.set_timeout(5000)
+
+        # Set the modes
+        self.init_trigger()
+
+
+        # Set channel information
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_CHENABLE, _spcm_regs.CHANNEL0 | _spcm_regs.CHANNEL1)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_CARDMODE, _spcm_regs.SPC_REC_FIFO_MULTI)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_SEGMENTSIZE, segsize)
+        # self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_MEMSIZE, memsize)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_LOOPS, nums)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_POSTTRIGGER, posttrigger)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_AMP0, amp0)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_AMP1, amp1)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_OFFS0, offs0)
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_OFFS1, offs1)
+
+        # Set the masks
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_ORMASK, _spcm_regs.SPC_TMASK_EXT0);
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_ANDMASK,        0);
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_CH_ORMASK0,     0);
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_CH_ORMASK1,     0);
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_CH_ANDMASK0,    0);
+        self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_TRIG_CH_ANDMASK1,    0);
+
 #########################
 ### General
 #########################
@@ -1138,7 +1192,7 @@ class Spectrum_M3i4142filter(Instrument):
         '''
         logging.debug(__name__ + ': Set clock mode to external reference clock')
         self._set_param(_spcm_regs.SPC_CLOCKMODE, _spcm_regs.SPC_CM_EXTREFCLOCK)
-        
+
     def set_clockmode_pll(self):
         '''
         Sets the clock mode to PLL
@@ -1524,6 +1578,50 @@ class Spectrum_M3i4142filter(Instrument):
         data = p_data.contents
         return data
 
+    def readout_raw_buffer_FIFO(self, nr_of_channels=1):
+        '''
+        Work in progress. Remy
+        Reads out the buffer, and returns a list with the size of the
+        buffer. Contains only data if the channel is triggered.
+
+        Input:
+            number of channels
+
+        Output:
+            data (int[memsize]): The data of the buffer
+        '''
+#        print nr_of_channels
+        logging.debug(__name__ + ' : Readout raw buffer FIFO')
+        # memsize do not exist in FIFO
+        # lMemsize = self.get_memsize()
+        lLoops = self.get_number_loops()
+        lSegsize = self.get_segmentsize()
+        # we will have to write a new parameter which will be number_loops for the FIFO mode
+
+        lBufsize = lLoops * lSegsize * nr_of_channels
+
+        #The data that we are going to obtain are in 16 bits.
+        a = (c_int16 * lBufsize)()
+        p_data = pointer(a)
+
+        err = self._spcm_win32.DefTransfer64(self._spcm_win32.handel, _spcm_regs.SPCM_BUF_DATA, _spcm_regs.SPCM_DIR_CARDTOPC, 0, p_data, c_int64(0), c_int64(2*lBufsize))
+
+        if (err!=0):
+            logging.error(__name__ + ' : Error setting up buffer')
+            self._get_error()
+            raise ValueError('Error communicating with device')
+
+        # readout data
+        err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_M2CMD,
+            _spcm_regs.M2CMD_DATA_STARTDMA | _spcm_regs.M2CMD_DATA_WAITDMA)
+
+        if (err!=0):
+            logging.error(__name__ + ' : Error during read, error nr: %i' % err)
+            self._get_error()
+            raise ValueError('Error communicating with device')
+
+        data = p_data.contents
+        return data
 
     def readout_singlechannel_singlemode_bin(self):
         '''
@@ -1717,9 +1815,14 @@ class Spectrum_M3i4142filter(Instrument):
         return data_scaled_ch0, data_scaled_ch1
 
 
+################################################################################
+# Remy notes on FIFO:
+# we should write a readout_raw_buffer for the FIFO mode inspired from the standard
+# one and the example on the page 69 of the manual.
+#  Then the readout_FIFO_data should be writen almost the same as the standard version.
+################################################################################
 
-
-    def readout_singlechannel_FIFO_data(self,numsamp,bufsize):
+    def readout_singlechannel_FIFO_data(self, numsamp, bufsize):
         '''
         Reads out the buffer in bfsize steps until numsamples are transfered in FIFO , and returns a list with the data of the
         buffer. Contains only data if the channel is triggered.
@@ -1738,7 +1841,7 @@ class Spectrum_M3i4142filter(Instrument):
         err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_LOOPS, c_int32(1))
         a = (c_int16 * lSegsize)()
         p_data = pointer(a)
-#        self.set_repetitions(numsamp)
+        # self.set_repetitions(numsamp)
         err = self._spcm_win32.DefTransfer64(self._spcm_win32.handel, _spcm_regs.SPCM_BUF_DATA, _spcm_regs.SPCM_DIR_CARDTOPC, c_int32(bufsize) , p_data, c_int64(0), c_int64(2*lSegsize))
 
         if (err!=0):
@@ -1764,32 +1867,122 @@ class Spectrum_M3i4142filter(Instrument):
                 logging.error(__name__ + ' : Error getting byte pointer')
                 self._get_error()
                 raise ValueError('Error communicating with device')
-#            print str(availbytes.value) +" bytes are available"
+            # print str(availbytes.value) +" bytes are available"
 
             Totbytes = Totbytes+availbytes.value
             err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_M2CMD,_spcm_regs.M2CMD_DATA_STARTDMA | _spcm_regs.M2CMD_DATA_WAITDMA)
-#            if data[0,0] == 'timeout':
-#                if (err!=0):
-#                    logging.error(__name__ + ' : Error during read, error nr: %i' % err)
-#                    self._get_error()
-#                    raise ValueError('Error communicating with device')
-            dt = p_data.contents
+            # dt = p_data.contents
             dt = numpy.array(dt,numpy.int64)
             data_scaled_ch0 = (2.0 * amp0 * (dt / fullscale) + offset0)/1e3
             if data == ():
-                data=data_scaled_ch0
+                data= data_scaled_ch0
             else:
-                data=numpy.vstack((data,data_scaled_ch0))
-#                data=data+data_scaled_ch0
+                data=numpy.vstack( ( data, data_scaled_ch0) )
+
             err = self._spcm_win32.SetParam64(self._spcm_win32.handel, _spcm_regs.SPC_DATA_AVAIL_CARD_LEN, availbytes)
             err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_M2CMD, _spcm_regs.M2CMD_DATA_WAITDMA)
-#            self.start()
-#            self.force_trigger()
+            # self.start()
+            # self.force_trigger()
+        self.stop()
+        if numsamp>1:
+            data=numpy.reshape(data,(numsamp,-1))
+        return data #(data/numsamp)
+
+    def readout_doublechannel_FIFO_data(self, numsamp, bufsize):
+        '''
+        Work in progress by Remy.
+        Reads out the buffer in bfsize steps until numsamples are transfered in FIFO , and returns a list with the data of the
+        buffer. Contains only data if the channel is triggered.
+
+        Input:
+            numsamp Number of samples, bufsize number of points per sample
+
+        Output:
+            data in Volts!!!!
+        '''
+        # under: copy of the readout_doublechannel_standard... to be changed for FIFO
+        lMemsize = self.get_memsize()
+        lSegsize = self.get_segmentsize()
+        amp0 = float(self.get_input_amp_ch0())
+        offset0 = float(self.get_input_offset_ch1())
+        amp1 = float(self.get_input_amp_ch0())
+        offset1 = float(self.get_input_offset_ch1())
+        #We get the fullscale in bins
+        fullscale = float(self.get_fullscale())
+
+        lnumber_of_segments = lMemsize / lSegsize
+        data = self.readout_raw_buffer(nr_of_channels=2)
+        if data == 'timeout':
+            return data
+        data = numpy.float32(numpy.ctypeslib.as_array(data))
+        data_scaled_ch0 = (2.0 * amp0 * (data[0::2] / fullscale) + offset0).reshape((-1,lSegsize))
+        data_scaled_ch1 = (2.0 * amp1 * (data[1::2] / fullscale) + offset1).reshape((-1,lSegsize))
+        return data_scaled_ch0, data_scaled_ch1
+
+        # under: adapted copy of previous readout_singlechannel_Fifo
+        lMemsize = self.get_memsize()
+        lSegsize = self.get_segmentsize()
+        lBufsize = lMemsize #* nr_of_channels
+        err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_CHENABLE,  _spcm_regs.CHANNEL0 | _spcm_regs.CHANNEL1 )
+        err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_CARDMODE, _spcm_regs.SPC_REC_FIFO_MULTI)
+        err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_LOOPS, c_int32(1))
+        a = (c_int16 * lSegsize)()
+        p_data = pointer(a)
+        # self.set_repetitions(numsamp)
+        err = self._spcm_win32.DefTransfer64(self._spcm_win32.handel, _spcm_regs.SPCM_BUF_DATA, _spcm_regs.SPCM_DIR_CARDTOPC, c_int32(bufsize) , p_data, c_int64(0), c_int64(2*lSegsize))
+
+        if (err!=0):
+            logging.error(__name__ + ' : Error setting up buffer')
+            self._get_error()
+            raise ValueError('Error communicating with device')
+        data = ()
+        self.set_trigger_software()
+        self.start()
+        self.force_trigger()
+        err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_M2CMD, _spcm_regs.M2CMD_DATA_WAITDMA)
+        availbytes =c_int64()
+        abyte=pointer(availbytes)
+        Totbytes=0
+        amp0 = float(self.get_input_amp_ch0())
+        offset0 = float(self.get_input_offset_ch0())
+        amp1 = float(self.get_input_amp_ch1())
+        offset1 = float(self.get_input_offset_ch1())
+        fullscale = float(self.get_fullscale())
+        rang=numpy.linspace(0, numsamp, 1)
+        for i in rang:
+            # readout data
+            err = self._spcm_win32.GetParam64(self._spcm_win32.handel, _spcm_regs.SPC_DATA_AVAIL_USER_LEN, byref(availbytes))
+            if (err!=0):
+                logging.error(__name__ + ' : Error getting byte pointer')
+                self._get_error()
+                raise ValueError('Error communicating with device')
+            # print str(availbytes.value) +" bytes are available"
+
+            Totbytes = Totbytes+availbytes.value
+            err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_M2CMD,_spcm_regs.M2CMD_DATA_STARTDMA | _spcm_regs.M2CMD_DATA_WAITDMA)
+            # if data[0,0] == 'timeout':
+            #     if (err!=0):
+            #         logging.error(__name__ + ' : Error during read, error nr: %i' % err)
+            #         self._get_error()
+            #         raise ValueError('Error communicating with device')
+            dt = p_data.contents
+            dt = numpy.array(dt,numpy.int64)
+            data_scaled_ch0 = (2.0 * amp0 * (dt / fullscale) + offset0)/1e3
+            data_scaled_ch1 = (2.0 * amp1 * (dt / fullscale) + offset1)/1e3
+
+            if data == ():
+                data = (data_scaled_ch0, data_scaled_ch1)
+            else:
+                data = numpy.vstack((data, (data_scaled_ch0, data_scaled_ch1))) # Remy: have to think of the way to put the data from both channels
+                # I hope this will do the job.
+            err = self._spcm_win32.SetParam64(self._spcm_win32.handel, _spcm_regs.SPC_DATA_AVAIL_CARD_LEN, availbytes)
+            err = self._spcm_win32.SetParam32(self._spcm_win32.handel, _spcm_regs.SPC_M2CMD, _spcm_regs.M2CMD_DATA_WAITDMA)
+            # self.start()
+            # self.force_trigger()
         self.stop()
         if numsamp>1:
             data=numpy.reshape(data,(numsamp,-1))
         return data#(data/numsamp)
-
 
 
 

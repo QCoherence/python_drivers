@@ -86,7 +86,8 @@ class virtual_readout_IQ_multi(Instrument):
         #We don't want to record data before the trigger so, we put the posttrigger time equal to the segment size
         #We initialize the card on two channel multiple recording mode
         self._spectrum.init_channel01_multiple_recording(nums=self._nums, segsize=segsize, posttrigger=segsize-8, amp0=amp0, amp1=amp1)
-#                       init_channel0_multiple_recording(self, nums = 4, segsize=1024, posttrigger=768, amp=500, offs=0):
+#                       init_channel0_multiple_recording(self, nums = 4, segsize=10
+# 24, posttrigger=768, amp=500, offs=0):
 #        self._spectrum.init_channel0_multiple_recording(nums=self._nums, segsize=segsize, posttrigger=segsize-8,amp=amp0)
 
         # we put the spectrum as ext ref clock mode:
@@ -147,6 +148,9 @@ class virtual_readout_IQ_multi(Instrument):
 #
 #
 #########################################################
+
+
+
 
     def do_set_frequency(self, frequency=1.):
         '''
