@@ -1,4 +1,4 @@
-# Tektronix_AWG5014.py class
+# Tabor_WX1284C.py class
 #
 # Nicolas Roch <nicolas.roch@neel.cnrs.fr>, 2015
 #
@@ -25,8 +25,7 @@ import struct
 import pyvisa.constants as vc
 import ctypes
 
-################### Constants
-
+################### Constants ##################################################
 MARKER_QUANTUM = 2        #: quantum of marker-length and marker-offset
 _EX_DAT_MARKER_1_MASK = 0x20000000L #: the mask of marker 1 in the extra-data (32-bits) value
 _EX_DAT_MARKER_2_MASK = 0x10000000L #: the mask of marker 2 in the extra-data (32-bits) value
@@ -70,7 +69,7 @@ class Tabor_WX1284C(Instrument):
 
     def __init__(self, name, address, reset=False):
         '''
-        Initializes the AWG520.
+        Initializes the Tabor_WX1284C.
 
         Input:
             name (string)    : name of the instrument
