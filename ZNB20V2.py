@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ZNB20.py is a driver for Rohde & Schwarz ZNB20 Vector Network Analyser
 # written by Thomas Weissl, modified by Nico Roch and Yuriy Krupko, 2014
 #
@@ -377,7 +378,7 @@ class ZNB20V2(Instrument):
         Define the type of the sweep: LINear | LOGarithmic | POWer | CW | POINt | SEGMent
 
         Input:
-            sweeptype (string): LIN, LOG, POW, CW, POIN or SEG
+            sweeptype (string): LIN, LOG, POW, CW, POIN or SEGM
         Output:
             None
         '''
@@ -392,10 +393,171 @@ class ZNB20V2(Instrument):
             self._visainstrument.write('SWE:TYPE CW')
         elif sweeptype.upper() in ('POIN'):
             self._visainstrument.write('SWE:TYPE POIN')
-        elif sweeptype.upper() in ('SEG'):
-            self._visainstrument.write('SWE:TYPE SEG')
+        elif sweeptype.upper() in ('SEGM'):
+            self._visainstrument.write('SWE:TYPE SEGM')
         else:
-            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
+            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEGM')
+
+
+#########################################################
+#
+#           Functions related to Segmented sweeps
+#
+#########################################################
+
+    def define_segment(self, segment_number, startfrequency, stopfrequency, points, power, time, BW ,set_time='dwell'):
+        '''
+        Define a segment indexed by segment_number.
+
+        Input:
+            startfrequency [GHz]= define the frequency at which the segment start
+            stopfrequency [GHz]= define the frequency at which the segment stop
+            points: define the number of points measured
+            power [dBm]: define the power of the VNA
+            time [s]: if set_time==dwell it is a delay for each partial measurement in the segment
+                      if set_time==sweeptime, we define the duration of the sweep in the segment
+            BW [Hz]: define the Bandwidth
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : we are defining the segment number %s' % segment_number)
+
+        # self._visainstrument.write('SEGM%s:DEL' % segment_number)
+        if set_time == 'dwell':
+            self._visainstrument.write('SEGM%s:DEF:SEL DWEL' %segment_number)
+
+            self._visainstrument.write('SEGM%s:DEF %sGHZ,%sGHZ,%s,%sDBM,%sS,%s,%sHZ' \
+                %(segment_number,startfrequency, stopfrequency, points, power, time,0, BW ) )
+            # print self._visainstrument.query('SEGM%s:DEF?' %segment_number)
+
+            ####################################################################
+            # we have to look at the errors checking of freq start and freq stop....
+            ####################################################################
+
+            asked_freq_start = self._visainstrument.query('SEGM%s:FREQ:STAR?'% segment_number)
+            given_freq_start = str(startfrequency*1e9)
+
+            if np.float(asked_freq_start) != np.float(given_freq_start):
+                print'error in setting start frequency at %s' %startfrequency
+                print asked_freq_start, given_freq_start
+                # print self._visainstrument.query('SEGM%s:FREQ:STAR?'% segment_number), unicode('%s' %int(startfrequency*1e9))
+                # print 'set at %s' %freq_start/1e9
+
+            asked_freq_stop = self._visainstrument.query('SEGM%s:FREQ:STOP?'% segment_number)
+            given_freq_stop = str(stopfrequency*1e9)
+
+            if np.float(asked_freq_stop) != np.float(given_freq_stop):
+                print'error in setting stop frequency at %s' %stopfrequency
+                print asked_freq_stop, given_freq_stop
+
+            if self._visainstrument.query('SEGM%s:SWE:POIN?'% segment_number) != unicode('%s' %points):
+                print'error in setting number of points'
+
+            asked_power = self._visainstrument.query('SEGM%s:POW?'% segment_number)
+            given_power = str(power)
+            if np.float(asked_power) != np.float(given_power):
+                print'error in setting power'
+                print asked_power, given_power
+
+                # print np.float(self._visainstrument.query('SEGM%s:POW?'% segment_number)), power
+
+            asked_dwell = self._visainstrument.query('SEGM%s:SWE:DWEL?'% segment_number)
+            given_dwell = str(time)
+            if np.float(asked_dwell) != np.float(given_dwell):
+                print'error in setting dwell time'
+                print asked_dwell, given_dwell
+
+            if self._visainstrument.query('SEGM%s:BWID?'% segment_number)!=unicode('%s' %BW):
+                print'error in setting the bandwidth'
+
+        elif set_time == 'sweeptime':
+            self._visainstrument.write('SEGM%s:DEF:SEL SWT' %segment_number)
+
+            self._visainstrument.write('SEGM%s:DEF %sGHZ,%sGHZ,%s,%sDBM,%sS,%s,%sHZ' \
+                %(segment_number,startfrequency, stopfrequency, points, power, time,0, BW ) )
+
+            if self._visainstrument.query('SEGM%s:FREQ:STAR?'% segment_number) != unicode('%s' %int(startfrequency*1e9)):
+                print'error in setting start frequency at %s' %startfrequency
+                # print 'set at %s' %freq_start/1e9
+
+            if self._visainstrument.query('SEGM%s:FREQ:STOP?'% segment_number)!=unicode('%s' %int(stopfrequency*1e9)):
+                print'error in setting stop frequency at %s' %stopfrequency
+
+            if self._visainstrument.query('SEGM%s:SWE:POIN?'% segment_number)!=unicode('%s' %points):
+                print'error in setting number of points'
+
+            if self._visainstrument.query('SEGM%s:POW?'% segment_number)!=unicode('%s' %power):
+                print'error in setting power'
+
+            if self._visainstrument.query('SEGM%s:SWE:POIN?'% segment_number)!=unicode('%s' %time):
+                print'error in setting dwell time'
+
+            if self._visainstrument.query('SEGM%s:BWID?'% segment_number)!=unicode('%s' %BW):
+                print'error in setting the bandwidth'
+
+        else:
+            print 'set_time should be dweel or sweeptime'
+
+    def define_power_sweep(self, startpow, stoppow, steppow, cwfrequency, BW, time, set_time='dwell'):
+        '''
+        Make a sweep in power where startpow can be greater than stoppow
+
+        Input:
+            startpow [dBm] : define the power at which begin the sweep
+            stoppow [dBm]: define the power at which finish the sweep
+            steppow [dBm]: define the step of the sweep
+            cwfrequency [GHz]: constant wave frequency of the VNA
+            time [s]: if set_time==dwell it is a delay for each partial measurement in the segment
+                      if set_time==sweeptime, we define the duration of the sweep in the segment
+            BW [Hz]: define the Bandwidth
+
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : making a sweep in power from %s to %s with a step of %s' % (startpow, stoppow, steppow))
+
+        #Destroy all the remaining segments from previous measurement
+        self._visainstrument.write('SEGM:DEL:ALL')
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?'))!=0:
+            print 'Error: segments not deleted'
+
+        pow_vec=np.arange(startpow, stoppow + steppow, steppow)
+        point=len(pow_vec)
+        for i in np.arange(point):
+            self.define_segment(i+1, cwfrequency, cwfrequency,1, pow_vec[i],time, BW, set_time )
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?'))!=point:
+            print 'Error: not the number of segment wanted'
+
+    def define_power_sweep_vec(self, pow_vec, cwfrequency, BW, time, set_time='dwell'):
+        '''
+        Define a sweep in power with a power vector.
+
+        Input:
+            pow_vec [dBm] : define the power vector
+            cwfrequency [GHz]: constant wave frequency of the VNA
+            time [s]: if set_time==dwell it is a delay for each partial measurement in the segment
+                      if set_time==sweeptime, we define the duration of the sweep in the segment
+            BW [Hz]: define the Bandwidth
+
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : making a sweep in power' % ())
+
+        #Delete all the remaining segments from previous measurement
+        self._visainstrument.write('SEGM:DEL:ALL')
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?')) != 0:
+            print 'Error: segments not deleted'
+
+        point = len(pow_vec)
+        for i in np.arange(point):
+            self.define_segment(i+1, cwfrequency, cwfrequency,1, pow_vec[i],time, BW, set_time )
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?')) != point:
+            print 'Error: not the number of segment wanted'
 
 
 #########################################################

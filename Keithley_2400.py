@@ -154,6 +154,7 @@ class Keithley_2400(Instrument):
             - Non
         '''
         self._visainstrument.write(':SOUR:CURR:RANG '+str(val))
+
     def set_status(self,val):
         self._visainstrument.write(':OUTP '+str(val))
 

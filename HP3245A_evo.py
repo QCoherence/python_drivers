@@ -61,54 +61,54 @@ class HP3245A(Instrument):
         except:
             raise SystemExit
         self._visainstrument.term_chars = '\r\n'
-        
-        self.add_parameter('amplitude', flags=Instrument.FLAG_GETSET, 
-            units='VorA', type=types.FloatType, maxstep=1e-4, stepdelay=200) 
-            
-        self.add_parameter('channel', flags=Instrument.FLAG_GETSET, 
+
+        self.add_parameter('amplitude', flags=Instrument.FLAG_GETSET,
+            units='VorA', type=types.FloatType, maxstep=1e-4, stepdelay=200)
+
+        self.add_parameter('channel', flags=Instrument.FLAG_GETSET,
             option_list=['A', 'B'], type=types.StringType)
 
-        self.add_parameter('dc_offset', flags=Instrument.FLAG_GETSET, units='VorA', 
+        self.add_parameter('dc_offset', flags=Instrument.FLAG_GETSET, units='VorA',
             type=types.FloatType, stepdelay=200)
-            
+
         self.add_parameter('duty_cycle', flags=Instrument.FLAG_GETSET,
             units='VorA', type=types.FloatType, minval=5, maxval=95)
-        
-        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, 
-            units='Hz', type=types.FloatType, minval=0, maxval=1e6) 
-            
-        self.add_parameter('resolution', flags=Instrument.FLAG_SET, 
+
+        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET,
+            units='Hz', type=types.FloatType, minval=0, maxval=1e6)
+
+        self.add_parameter('resolution', flags=Instrument.FLAG_SET,
             option_list=['low', 'high'], type=types.StringType)
-        
-        self.add_parameter('range', flags=Instrument.FLAG_SET, units='VorA', 
+
+        self.add_parameter('range', flags=Instrument.FLAG_SET, units='VorA',
             type=types.FloatType)
-        
-        self.add_parameter('output_mode', flags=Instrument.FLAG_GETSET,  
+
+        self.add_parameter('output_mode', flags=Instrument.FLAG_GETSET,
             option_list=['DCI', 'DCV', 'DCMEMI', 'DCMEMV', 'ACI', 'ACV',
             'RPI', 'RPV', 'SQI', 'SQV', 'WFI', 'WFV'], type=types.StringType)
-            
-        self.add_parameter('trigger_mode', flags=Instrument.FLAG_GETSET,  
+
+        self.add_parameter('trigger_mode', flags=Instrument.FLAG_GETSET,
             option_list=['OFF', 'ARMWF', 'GATED', 'DUALFR'], type=types.StringType)
-            
-        self.add_parameter('trigger_event', flags=Instrument.FLAG_GETSET,  
-            option_list=['TB0', 'TB1', 'EXT', 'EXTBAR', 'LOW', 'HIGH', 'HOLD', 
+
+        self.add_parameter('trigger_event', flags=Instrument.FLAG_GETSET,
+            option_list=['TB0', 'TB1', 'EXT', 'EXTBAR', 'LOW', 'HIGH', 'HOLD',
             'SGL'], type=types.StringType)
-            
+
         self.add_function('reset')
-        
+
         if reset:
             self.reset()
-        
+
         self.get_all()
 
-        
+
     def get_all(self):
         '''
             Get all parameters of the device
-            
+
             Input:
                 None
-            
+
             Output:
                 None
         '''
@@ -119,7 +119,7 @@ class HP3245A(Instrument):
         self.get_frequency()
         self.get_trigger_mode()
         self.get_trigger_event()
-        
+
 
     def set_defaults(self):
         '''
@@ -144,7 +144,7 @@ class HP3245A(Instrument):
         self.set_trigger_mode('OFF')
         self._visainstrument.write('arange on')
 
-    
+
     def reset(self):
         '''
         Reset the instrument
@@ -158,12 +158,12 @@ class HP3245A(Instrument):
         logging.info(__name__ + ' : Reset the instrument')
         self._visainstrument.write('rst')
 
-        
+
     def do_set_output_mode(self, modeName):
         '''
-        Change mode and apply 0 Ampere/Volt (or: do nothing if the 
-        active channel is already in the correct mode). Accepts any of the 
-        following:        
+        Change mode and apply 0 Ampere/Volt (or: do nothing if the
+        active channel is already in the correct mode). Accepts any of the
+        following:
         'DCI' direct current
         'DCV' direct voltage
         'DCMEMI' triggered direct current
@@ -178,7 +178,7 @@ class HP3245A(Instrument):
         'WFV' arbitrary waveform voltage
 
         Input:
-            modeName (str): name of the mode 
+            modeName (str): name of the mode
 
         Output:
             None
@@ -187,7 +187,7 @@ class HP3245A(Instrument):
         modeName = modeName.lower()
         modeOptions = self.get_parameter_options('output_mode')['option_list']
         modeOptions = [mo.lower() for mo in modeOptions]
-        
+
         if oldModeName != modeName:
             if modeName in modeOptions:
                 logging.info(__name__ + ' : change the active channel output mode to '+str(modeName))
@@ -196,20 +196,20 @@ class HP3245A(Instrument):
             else:
                 raise ValueError('Input parameter must be one of the following: ' + ', '.join(modeOptions))
 
-                
+
     def do_get_output_mode(self):
         '''
-        Get the output mode of the device. 
+        Get the output mode of the device.
 
         Input:
             None
 
         Output:
-            modeName: string 
+            modeName: string
         '''
         return (self._visainstrument.ask('apply? ')).lower()
-        
-        
+
+
     def do_set_trigger_mode(self, modeName):
         '''
         Change trigger mode. Accepts any of the following:
@@ -219,7 +219,7 @@ class HP3245A(Instrument):
         'DUALFR' output frequency can be varied between two values
 
         Input:
-            modeName (str): name of the mode 
+            modeName (str): name of the mode
 
         Output:
             None
@@ -227,7 +227,7 @@ class HP3245A(Instrument):
 
         modeOptions = self.get_parameter_options('trigger_mode')['option_list']
         modeOptions = [mo.lower() for mo in modeOptions]
-        
+
         if modeName in modeOptions:
             logging.info(__name__ + ' : change the active channel output mode to ' + str(modeName))
             logging.info(__name__ + ' : set amplitude to 0')
@@ -246,8 +246,8 @@ class HP3245A(Instrument):
             modeName (str): name of the mode
         '''
         return (self._visainstrument.ask('trigmode? ')).lower()
-        
-        
+
+
     def do_set_trigger_event(self, eventName):
         '''
         Change trigger event type. Accepts any of the following:
@@ -259,7 +259,7 @@ class HP3245A(Instrument):
         'HIGH':   Used with 'LOW' parameter to internally trigger
         'HOLD':   Same as HIGH parameter
         'SGL':    Single trigger
-        
+
         Input:
             eventName (str): name of the trigger event type
 
@@ -268,7 +268,7 @@ class HP3245A(Instrument):
         '''
         eventOptions = self.get_parameter_options('trigger_event')['option_list']
         eventOptions = [mo.lower() for mo in eventOptions]
-        
+
         if eventName in eventOptions:
             logging.info(__name__ + ' : change the active channel trigger event type to ' + str(eventName))
             logging.info(__name__ + ' : set amplitude to 0')
@@ -276,7 +276,7 @@ class HP3245A(Instrument):
         else:
             raise ValueError('Input parameter must be one of the following: ' + ', '.join(eventOptions))
 
-            
+
     def do_get_trigger_event(self):
         '''
         Get the trigger event type of the device.
@@ -288,16 +288,16 @@ class HP3245A(Instrument):
             eventName (str): name of the trigger event type
         '''
         return (self._visainstrument.ask('trigin? ')).lower()
-        
-    
+
+
     def do_set_channel(self, channelName, changeDisplay=True):
         '''
-            Sets the active channel ("A" or "B"). All subsequent set and get 
+            Sets the active channel ("A" or "B"). All subsequent set and get
             commands are applied to this channel until it is changed again.
 
             Input:
                 channelName (str): "A" or "B", channel name
-                changeDisplay (bool): decides whether the device display is 
+                changeDisplay (bool): decides whether the device display is
                                       changed to show the active channel
 
             Output:
@@ -331,8 +331,8 @@ class HP3245A(Instrument):
         elif channelInt == 100:
             return 'B'
 
-            
-        
+
+
     def do_set_amplitude(self, value):
         '''
             Set the output amplitude of the active channel.
@@ -346,7 +346,7 @@ class HP3245A(Instrument):
         mode = self.get_mode()
         logging.info(__name__ + ' : set the amplitude to ' + str(value))
         self._visainstrument.write('apply ' + mode + ' ' + str(value))
-        
+
     def do_get_amplitude(self):
         '''
             Get the output amplitude of the active channel.
@@ -358,8 +358,8 @@ class HP3245A(Instrument):
         '''
         logging.info(__name__ + ' : Get the amplitude')
         return float(self._visainstrument.ask('OUTPUT? '))
-    
-    
+
+
     def do_set_dc_offset(self, value):
         '''
             Set the dc offset of the active channel.
@@ -372,8 +372,8 @@ class HP3245A(Instrument):
         '''
         logging.info(__name__ + ' : set the dc offset to '+str(value))
         self._visainstrument.write('dcoff ' + str(value))
-        
-        
+
+
     def do_get_dc_offset(self):
         '''
             Get the dc offset of the active channel.
@@ -386,29 +386,29 @@ class HP3245A(Instrument):
         logging.debug(__name__ + ' : Get the dc offset')
         return float(self._visainstrument.ask('dcoff? '))
 
-        
+
     def do_set_frequency(self, value):
         # To do: accept second frequency to get compatibility with dual frequency mode
         mode = self.get_mode()
         self._visainstrument.write('freq ' + str(value))
 
-        
+
     def do_get_frequency(self):
-        
+
         return float(self._visainstrument.ask('freq? '))
 
-    
+
     def do_set_duty_cycle(self, value):
-        
+
         mode = self.get_mode()
         self._visainstrument.write('duty ' + str(value))
-        
-    
+
+
     def do_get_duty_cycle(self):
-        
+
         return float(self._visainstrument.ask('duty? '))
-    
-    
+
+
     def do_set_range(self, rangeValue):
         '''
             Set the current/voltage range. The range is selected accordingly out of the following lists:
@@ -420,7 +420,7 @@ class HP3245A(Instrument):
                     "high resolution":  Imax = 0.1 mA, dI = 0.1 nA
                                         Imax = 1 mA,   dI = 1 nA
                                         Imax = 10 mA,  dI = 10 nA
-                                        Imax = 10 mA,  dI = 100 nA
+                                        Imax = 100 mA,  dI = 100 nA
                 In voltage mode:
                     "low resolution":   Vmax = 0.15625 V, dV = 79 uV
                                         Vmax = 0.3125 V, dV = 157 uV
@@ -433,7 +433,7 @@ class HP3245A(Instrument):
                                         Vmax = 10 V, dV = 10 uV
 
             Input:
-                - rangeValue (float or str): Maximum expected current or 
+                - rangeValue (float or str): Maximum expected current or
                                              voltage in Ampere or Volt, or
                                              alternatively "AUTO" for autorange.
             Output:
@@ -442,7 +442,7 @@ class HP3245A(Instrument):
         logging.info(__name__ + ' : set the range to '+str(rangeValue))
         self._visainstrument.write('range '+str(rangeValue))
 
-        
+
     def do_set_resolution(self, resolution):
         '''
             Set the resolution of the device.
@@ -458,17 +458,3 @@ class HP3245A(Instrument):
             self._visainstrument.write('dcres '+str(resolution))
         else:
             raise ValueError('The input parameter should be "low" or "high"')
-
-            
-    
-
-
-
-
-
-
-
-
-
-
-
