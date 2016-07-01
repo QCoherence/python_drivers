@@ -160,7 +160,7 @@ class ATS9360_NPT(Instrument):
         # Attributes of the acquisition
         self.acquired_samples           = 128*80 # In S. Must be integer
         self.acquisition_time           = self.acquired_samples/1.8 # In ns, float
-        self.default_records_per_buffer = 100 # Must be integer and even
+        self.default_records_per_buffer = 250 # Must be integer and even
         # The current records per buffer is equal to the default one at the
         # initialization of the board.
         self.records_per_buffer         = self.default_records_per_buffer
@@ -489,20 +489,32 @@ class ATS9360_NPT(Instrument):
             Output:
                 - None.
         '''
-
+# ******************* previous code-->
+        # if nb_averaging%2:
+        #     raise ValueError('The number of averaging should be even')
+        # if nb_averaging*self.nb_sequence > self.default_records_per_buffer:
+        #     if nb_averaging%self.default_records_per_buffer:
+        #         raise ValueError('When nb_averaging x nb_sequence >100, nb_averaging must be a multiple of 100')
+        #
+        # if nb_averaging*self.nb_sequence < self.default_records_per_buffer:
+        #     self.buffers_per_acquisition = 1
+        #     self.records_per_buffer      = int(nb_averaging*self.nb_sequence)
+        # else:
+        #     self.records_per_buffer      = int(self.default_records_per_buffer)
+        #     self.buffers_per_acquisition = int(np.ceil(float(nb_averaging*self.nb_sequence)\
+        #                                                /self.default_records_per_buffer))
+# ********************       <--
         if nb_averaging%2:
             raise ValueError('The number of averaging should be even')
-        if nb_averaging*self.nb_sequence > self.default_records_per_buffer:
-            if nb_averaging%self.default_records_per_buffer:
-                raise ValueError('When nb_averaging x nb_sequence >100, nb_averaging must be a multiple of 100')
+        # if nb_averaging*self.nb_sequence > self.default_records_per_buffer:
+        #     if nb_averaging*self.nb_sequence%self.default_records_per_buffer:
+        #         raise ValueError('When nb_averaging x nb_sequence >100, nb_averaging*nb_sequence must be a multiple of 100')
 
         if nb_averaging*self.nb_sequence < self.default_records_per_buffer:
             self.buffers_per_acquisition = 1
             self.records_per_buffer      = int(nb_averaging*self.nb_sequence)
         else:
-            self.records_per_buffer      = int(self.default_records_per_buffer)
-            self.buffers_per_acquisition = int(np.ceil(float(nb_averaging*self.nb_sequence)\
-                                                       /self.default_records_per_buffer))
+            self.buffers_per_acquisition = int(np.ceil(nb_averaging*self.nb_sequence/self.records_per_buffer))
 
         if output:
             m  = 'buffer per acquisition:', self.buffers_per_acquisition
@@ -546,19 +558,26 @@ class ATS9360_NPT(Instrument):
 
         if nb_sequence%2:
             raise ValueError('The number of sequence should be even')
-
-        # Number of averaging
-        nb_averaging = self.buffers_per_acquisition*self.records_per_buffer\
-                       /self.nb_sequence
-
-        if nb_sequence*nb_averaging < self.default_records_per_buffer:
-            self.buffers_per_acquisition = 1
-            self.records_per_buffer      = int(nb_averaging*nb_sequence)
+# ****************** previous code -->
+        # # Number of averaging
+        # nb_averaging = self.buffers_per_acquisition*self.records_per_buffer\
+        #                /self.nb_sequence
+        #
+        # if nb_sequence*nb_averaging < self.default_records_per_buffer:
+        #     self.buffers_per_acquisition = 1
+        #     self.records_per_buffer      = int(nb_averaging*nb_sequence)
+        # else:
+        #     self.records_per_buffer      = int(self.default_records_per_buffer)
+        #     self.buffers_per_acquisition = int(nb_averaging*nb_sequence/self.records_per_buffer)
+        #
+        # self.nb_sequence = nb_sequence
+# ******************** <--
+        if nb_sequence<251:
+            self.records_per_buffer         = int(nb_sequence)
+            self.nb_sequence = int(nb_sequence)
         else:
-            self.records_per_buffer      = int(self.default_records_per_buffer)
-            self.buffers_per_acquisition = int(nb_averaging*nb_sequence/self.records_per_buffer)
-
-        self.nb_sequence = nb_sequence
+            self.records_per_buffer         = 250
+            self.nb_sequence = int(nb_sequence)
 
         if output:
             m  = 'buffer per acquisition:', self.buffers_per_acquisition
