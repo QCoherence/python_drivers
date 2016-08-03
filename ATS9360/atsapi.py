@@ -476,6 +476,7 @@ else:
 U16 = c_uint16
 U32 = c_uint32
 U8  = c_byte
+DOUBLE = c_double
 
 ats.AlazarErrorToText.restype = c_char_p
 ats.AlazarErrorToText.argtypes = [U32]
@@ -941,3 +942,10 @@ class Board:
     def waitAsyncBufferComplete(self, buffer, timeout_ms):
         '''Blocks until the board confirms that buffer is filled with data.'''
         ats.AlazarWaitAsyncBufferComplete(self.handle, buffer, timeout_ms)
+
+    ats.AlazarOCTIgnoreBadClock.restype = U32
+    ats.AlazarOCTIgnoreBadClock.argtypes = [U32, U32, DOUBLE, DOUBLE, POINTER(DOUBLE), POINTER(DOUBLE)]
+    ats.AlazarOCTIgnoreBadClock.errcheck = returnCodeCheck
+    def octIgnoreBadClock(self, enable, goodClockDuration, badClockDuration, triggerCycleTime, triggerPulseWidth):
+        '''Configure OCT Ignore Bad Clock.'''
+        ats.AlazarOCTIgnoreBadClock(self.handle, enable, goodClockDuration, badClockDuration, triggerCycleTime, triggerPulseWidth)
