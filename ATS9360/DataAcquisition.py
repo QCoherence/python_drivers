@@ -22,6 +22,9 @@ import numpy as np
 import time
 import atsapi as ats
 
+windowType = ats.DSP_WINDOW_HAMMING
+
+
 class DataAcquisition(object):
     """
         Class handling the acquisition of data from the ATS board.
@@ -78,7 +81,7 @@ class DataAcquisition(object):
 
     def set_input_control(self, board):
         """
-            Set the two input (channel A and B) of the board.
+            Set the two input (CHANNEL A and B) of the board.
             The input range is fixed two +-400mV, the impedance to 50 ohm
             (cannot be changed) and, the coupling of the inputs to DC.
         """
@@ -171,7 +174,7 @@ class DataAcquisition(object):
 
         # No pre-trigger samples in NPT mode
         preTriggerSamples     = 0
-        postTriggerSamples    = parameters['acquired_samples']
+        postTriggerSamples    = parameters['samplesPerRecord']
 
         # Select the number of records per DMA buffer.
         recordsPerBuffer      = parameters['records_per_buffer']
@@ -179,17 +182,75 @@ class DataAcquisition(object):
         # Select the number of buffers per acquisition.
         buffersPerAcquisition = parameters['buffers_per_acquisition']
 
-        # We assume two active channels
-        channels              = ats.CHANNEL_A | ats.CHANNEL_B
-        channelCount          = 2
+        # get the info about the FFT module
+        if parameters['mode'] == 'FFT':
 
+            dsp_array=board.dspGetModules()
 
-        # Compute the number of bytes per record and per buffer
-        memorySize_samples, bitsPerSample = board.getChannelInfo()
-        bytesPerSample   = (bitsPerSample.value + 7) // 8
+            fft_module=dsp_array[0]
+
+            dsp_info=fft_module.dspGetInfo()
+
+        # define the channel mask according to the working mode of the digitizer
+        if parameters['mode']== 'FFT':
+            # Only channel A is used when on-FPGA FFT is active
+            channels              = ats.CHANNEL_A
+            channelCount          = 1
+        elif parameters['mode']== 'CHANNEL_AB':
+            # For two active channels
+            channels              = ats.CHANNEL_A | ats.CHANNEL_B
+            channelCount          = 2
+        elif parameters['mode']== 'CHANNEL_A':
+            # If channel A only is active
+            channels              = ats.CHANNEL_A
+            channelCount          = 1
+        elif parameters['mode']== 'CHANNEL_B':
+            # If channel B only is active
+            channels              = ats.CHANNEL_B
+            channelCount          = 1
+        else:
+            raise ValueError('mode of the digitizer must be "CHANNEL_AB" or \
+                            "CHANNEL_A" or "CHANNEL_B" or "FFT"')
+
+        # Compute the number of samples per record
         samplesPerRecord = preTriggerSamples + postTriggerSamples
-        bytesPerRecord   = bytesPerSample * samplesPerRecord
-        bytesPerBuffer   = bytesPerRecord * recordsPerBuffer * channelCount
+
+        #Configure the FFT module
+        if parameters['mode'] == 'FFT':
+            fftLength_samples = 1
+            while fftLength_samples < samplesPerRecord :
+                fftLength_samples *= 2
+
+            # Sets the real part of the FFT windowing
+            fft_window_real=ats.dspGenerateWindowFunction(windowType, samplesPerRecord, fftLength_samples - samplesPerRecord)
+
+            # According to the documentation, the imaginary part of the FFT windowing should be filled with zeros
+            fft_window_imag=ats.dspGenerateWindowFunction(windowType, 0, fftLength_samples - samplesPerRecord)
+
+            # Configures the FFT window
+            fft_module.fftSetWindowFunction(samplesPerRecord,ctypes.c_void_p(fft_window_real.ctypes.data),ctypes.c_void_p(fft_window_imag.ctypes.data))
+
+            # Compute the number of bytes per record and per buffer
+
+            # For now the output of the output of the on-FPGA FFT is set to 'FFT_OUTPUT_FORMAT_U16_AMP2',
+            # thus the number of bytes per sample is 2
+            bytesPerSample = 2
+
+            # Computes the number of bytes per record according to the settings of the on-FPGA FFT
+            bytesPerRecord=fft_module.fftSetup(channels, samplesPerRecord, fftLength_samples, ats.FFT_OUTPUT_FORMAT_U16_AMP2, ats.FFT_FOOTER_NONE,0)
+
+            bytesPerBuffer   = bytesPerRecord * recordsPerBuffer
+            parameters['samplesPerRecord'] = bytesPerRecord/bytesPerSample
+
+        else:
+
+            # Compute the number of bytes per record and per buffer
+            memorySize_samples, bitsPerSample = board.getChannelInfo()
+            bytesPerSample   = (bitsPerSample.value + 7) // 8
+
+            bytesPerRecord   = bytesPerSample * samplesPerRecord
+            bytesPerBuffer   = bytesPerRecord * recordsPerBuffer * channelCount
+            parameters['samplesPerRecord'] = bytesPerRecord/bytesPerSample
 
         # Select number of DMA buffers to allocate
         bufferCount = parameters['nb_buffer_allocated']
@@ -213,13 +274,38 @@ class DataAcquisition(object):
         # Prepate the board to work in the asynchroneous mode of acquisition
         recordsPerAcquisition = recordsPerBuffer * buffersPerAcquisition
 
-        board.beforeAsyncRead(channels,
-                              -preTriggerSamples,
-                              samplesPerRecord,
-                              recordsPerBuffer,
-                              recordsPerAcquisition,
-                              ats.ADMA_EXTERNAL_STARTCAPTURE \
-                              | ats.ADMA_NPT | ats.ADMA_FIFO_ONLY_STREAMING)
+        if parameters['mode'] == 'FFT':
+            admaFlags = ats.ADMA_EXTERNAL_STARTCAPTURE| ats.ADMA_NPT | ats.ADMA_DSP
+            board.beforeAsyncRead(channels,
+                                0,
+                                bytesPerRecord,
+                                recordsPerBuffer,
+                                0x7FFFFFFF,
+                                admaFlags)
+        elif parameters['mode'] == 'CHANNEL_AB':
+            board.beforeAsyncRead(channels,
+                                -preTriggerSamples,
+                                samplesPerRecord,
+                                recordsPerBuffer,
+                                recordsPerAcquisition,
+                                ats.ADMA_EXTERNAL_STARTCAPTURE \
+                                | ats.ADMA_NPT | ats.ADMA_FIFO_ONLY_STREAMING)
+        elif parameters['mode'] == 'CHANNEL_A':
+             board.beforeAsyncRead(channels,
+                                -preTriggerSamples,
+                                samplesPerRecord,
+                                recordsPerBuffer,
+                                recordsPerAcquisition,
+                                ats.ADMA_EXTERNAL_STARTCAPTURE \
+                                | ats.ADMA_NPT | ats.ADMA_FIFO_ONLY_STREAMING)
+        elif parameters['mode'] == 'CHANNEL_B':
+             board.beforeAsyncRead(channels,
+                                -preTriggerSamples,
+                                samplesPerRecord,
+                                recordsPerBuffer,
+                                recordsPerAcquisition,
+                                ats.ADMA_EXTERNAL_STARTCAPTURE \
+                                | ats.ADMA_NPT | ats.ADMA_FIFO_ONLY_STREAMING)
 
 
         # Put the buffers previously created in the list of available buffers
@@ -230,7 +316,7 @@ class DataAcquisition(object):
 
 
 
-    def data_acquisition(self, board, queue_data_cha, queue_data_chb, parameters, buffers):
+    def data_acquisition(self, board, queue_data, parameters, buffers):
         """
             Acquire data and put them in the FIFO queue_data buffer memory.
 
@@ -240,7 +326,7 @@ class DataAcquisition(object):
         buffersPerAcquisition = parameters['buffers_per_acquisition']
         recordsPerBuffer      = parameters['records_per_buffer']
         preTriggerSamples     = 0 # NPT mode
-        postTriggerSamples    = parameters['acquired_samples']
+        postTriggerSamples    = parameters['samplesPerRecord']
         samplesPerRecord      = preTriggerSamples + postTriggerSamples
 
         start = time.clock() # Keep track of when acquisition started
@@ -255,13 +341,23 @@ class DataAcquisition(object):
         while buffersCompleted < buffersPerAcquisition and parameters['measuring']:
 
             buff = buffers[buffersCompleted % len(buffers)]
-            board.waitAsyncBufferComplete(buff.addr, timeout_ms=5000)
+            if parameters['mode'] == 'FFT':
+                board.dspGetBuffer(buff.addr, timeout_ms=5000)
+            else:
+                board.waitAsyncBufferComplete(buff.addr, timeout_ms=5000)
 
             buffersCompleted += 1
             bytesTransferred += buff.size_bytes
 
-            queue_data_cha.put(np.copy(buff.buffer[0::2]))
-            queue_data_chb.put(np.copy(buff.buffer[1::2]))
+            if parameters['mode'] == 'FFT':
+                queue_data.put(np.copy(buff.buffer))
+            elif parameters['mode'] == 'CHANNEL_AB':
+                queue_data[0].put(np.copy(buff.buffer[0::2]))
+                queue_data[1].put(np.copy(buff.buffer[1::2]))
+            elif parameters['mode'] == 'CHANNEL_A':
+                queue_data.put(np.copy(buff.buffer))
+            elif parameters['mode'] == 'CHANNEL_B':
+                queue_data.put(np.copy(buff.buffer))
 
             # Add the buffer to the end of the list of available buffers.
             board.postAsyncBuffer(buff.addr, buff.size_bytes)
@@ -290,7 +386,7 @@ class DataAcquisition(object):
 
 
 
-    def get_data(self, queue_data_cha, queue_data_chb, parameters):
+    def get_data(self, queue_data, parameters):
         """
             Method allowing the transfert of data from the board to the computer.
             The board is instanced following the parameters input and data are
@@ -326,15 +422,25 @@ class DataAcquisition(object):
 
         # We launch the data acquisition
         parameters['measured_buffers'] = self.data_acquisition(board,
-                                                               queue_data_cha, queue_data_chb,
+                                                               queue_data,
                                                                parameters, buffers)
 
         # We stop the transfer.
-        board.abortAsyncRead()
+        if parameters['mode'] == 'FFT' :
+            board.dspAbortCapture()
+        else:
+            board.abortAsyncRead()
 
         # We inform the parent process that the board is properly "closed"
         parameters['safe_acquisition'] = True
 
         # Once the board is "close" properly, we close the FIFO memory
-        queue_data_cha.close()
-        queue_data_chb.close()
+        if parameters['mode'] == 'FFT' :
+            queue_data.close()
+        if parameters['mode'] == 'CHANNEL_AB' :
+            queue_data[0].close()
+            queue_data[1].close()
+        if parameters['mode'] == 'CHANNEL_A' :
+            queue_data.close()
+        if parameters['mode'] == 'CHANNEL_B' :
+            queue_data.close()
