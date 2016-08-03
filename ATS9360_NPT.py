@@ -232,30 +232,6 @@ class ATS9360_NPT(Instrument):
 
 
 
-    # def _get_bytes_per_buffer(self):
-    #     """
-    #         Return the number of bytes per buffer of the board.
-    #         The calculation is performed assuming that the board works in the
-    #         NPT mode => no pre-trigger sample.
-    #     """
-    #
-    #     # For sake of clarity, even fixed variable are declared
-    #     # The name of the variable is meaningfull
-    #     bitsPerSample      = 12
-    #     preTriggerSamples  = 0 # We assume NPT mode
-    #     postTriggerSamples = self.samplesPerRecord
-    #     channelCount       = 2 # We assume always two channels active
-    #     recordsPerBuffer   = self.records_per_buffer
-    #
-    #     bytesPerSample   = (bitsPerSample + 7) // 8
-    #     samplesPerRecord = preTriggerSamples + postTriggerSamples
-    #     bytesPerRecord   = bytesPerSample * samplesPerRecord
-    #     bytesPerBuffer   = bytesPerRecord * recordsPerBuffer * channelCount
-    #
-    #     return int(bytesPerBuffer)
-
-
-
     def _get_parameters(self):
         """
             Create a Manager for the multiprocessing containing all parameters
@@ -584,29 +560,9 @@ class ATS9360_NPT(Instrument):
             Output:
                 - None.
         '''
-# ******************* previous code-->
-        # if nb_averaging%2:
-        #     raise ValueError('The number of averaging should be even')
-        # if nb_averaging*self.nb_sequence > self.default_records_per_buffer:
-        #     if nb_averaging%self.default_records_per_buffer:
-        #         raise ValueError('When nb_averaging x nb_sequence >100, nb_averaging must be a multiple of 100')
-        #
-        # if nb_averaging*self.nb_sequence < self.default_records_per_buffer:
-        #     self.buffers_per_acquisition = 1
-        #     self.records_per_buffer      = int(nb_averaging*self.nb_sequence)
-        # else:
-        #     self.records_per_buffer      = int(self.default_records_per_buffer)
-        #     self.buffers_per_acquisition = int(np.ceil(float(nb_averaging*self.nb_sequence)\
-        #                                                /self.default_records_per_buffer))
-# ********************       <--
-
-############### Farshad Version ####################
 
         if nb_averaging%2:
             raise ValueError('The number of averaging should be even')
-        # if nb_averaging*self.nb_sequence > self.default_records_per_buffer:
-        #     if nb_averaging*self.nb_sequence%self.default_records_per_buffer:
-        #         raise ValueError('When nb_averaging x nb_sequence >100, nb_averaging*nb_sequence must be a multiple of 100')
 
         if nb_averaging*self.nb_sequence < self.default_records_per_buffer:
             self.buffers_per_acquisition = 1
@@ -623,17 +579,6 @@ class ATS9360_NPT(Instrument):
 
             return m
 
-################ Nico Version ####################
-        # self.averaging=nb_averaging
-        #
-        # if nb_averaging*self.nb_sequence*self.samplesPerRecord*2*2 < self.max_size_per_buffer:
-        #     self.records_per_buffer      = int(nb_averaging*self.nb_sequence)
-        #     self.buffers_per_acquisition = 1
-        # else:
-        #     self.records_per_buffer      = int(self.max_size_per_buffer/(self.samplesPerRecord*2*2))
-        #     self.buffers_per_acquisition = int(np.ceil(float(nb_averaging*self.nb_sequence)/self.records_per_buffer))
-
-
     def do_get_averaging(self):
         '''
             Get the number of averaging
@@ -645,11 +590,7 @@ class ATS9360_NPT(Instrument):
                 - number_of_averaging (int): number of averaging
         '''
 
-#################### Farshad Version ##################
         return self.buffers_per_acquisition*self.records_per_buffer/self.nb_sequence
-
-############################ Nico Version ##############
-        # return self.averaging
 
 
     def do_set_nb_sequence(self, nb_sequence, output=False):
@@ -666,24 +607,6 @@ class ATS9360_NPT(Instrument):
                 - None.
         '''
 
-        # if nb_sequence%2:
-        #     raise ValueError('The number of sequence should be even')
-# ****************** previous code -->
-        # Number of averaging
-        # nb_averaging = self.buffers_per_acquisition*self.records_per_buffer\
-        #                /self.nb_sequence
-        #
-        # if nb_sequence*nb_averaging < self.default_records_per_buffer:
-        #     self.buffers_per_acquisition = 1
-        #     self.records_per_buffer      = int(nb_averaging*nb_sequence)
-        # else:
-        #     self.records_per_buffer      = int(self.default_records_per_buffer)
-        #     self.buffers_per_acquisition = int(nb_averaging*nb_sequence/self.records_per_buffer)
-        #
-        # self.nb_sequence = nb_sequence
-# ******************** <--
-
-############### Farshad Version ####################
         if nb_sequence<(self.default_records_per_buffer +1):
             self.records_per_buffer         = int(nb_sequence)
             self.nb_sequence = int(nb_sequence)
@@ -699,10 +622,6 @@ class ATS9360_NPT(Instrument):
             m += 'tot:', self.buffers_per_acquisition*self.records_per_buffer
 
             return m
-
-
-####################### Nico Version ######################
-        # self.nb_sequence = int(nb_sequence)
 
 
     def do_get_nb_sequence(self):
@@ -1042,11 +961,9 @@ class ATS9360_NPT(Instrument):
                 - percentage (float)
         """
 
-######################## Farshad Version ######################
+
         return round(self._acquired_sequences*100./self.get_averaging(), 2)
 
-######################## Nico Version ###################
-        # return round(self._acquired_sequences*100./self.buffers_per_acquisition, 2)
 
     #########################################################################
     #
