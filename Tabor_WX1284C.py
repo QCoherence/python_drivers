@@ -1,4 +1,4 @@
-# Tektronix_AWG5014.py class
+# Tabor_WX1284C.py class
 #
 # Nicolas Roch <nicolas.roch@neel.cnrs.fr>, 2015
 #
@@ -70,7 +70,7 @@ class Tabor_WX1284C(Instrument):
 
     def __init__(self, name, address, reset=False):
         '''
-        Initializes the AWG520.
+        Initializes the Tabor_WX1284C.
 
         Input:
             name (string)    : name of the instrument
