@@ -1181,7 +1181,7 @@ class ZNB20V2(Instrument):
 #
 #########################################################
 
-    def get_driving_mode(self):
+    def do_get_driving_mode(self):
         '''
         Get the driving mode see page 423 of the manual for details
 
@@ -1204,7 +1204,7 @@ class ZNB20V2(Instrument):
             return 'Chopped'
 
 
-    def set_driving_mode(self, mode):
+    def do_set_driving_mode(self, mode):
         '''
         Set the driving mode see page 423 of the manual for details
 
