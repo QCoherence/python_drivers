@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ZNB20.py is a driver for Rohde & Schwarz ZNB20 Vector Network Analyser
 # written by Thomas Weissl, modified by Nico Roch and Yuriy Krupko, 2014
 #
@@ -49,7 +50,8 @@ class ZNB20V2(Instrument):
         logging.debug(__name__ + ' : Initializing instrument')
 
         Instrument.__init__(self, name, tags=['physical'])
-        rm = visa.ResourceManager
+
+        rm = visa.ResourceManager()
 
         self._address = address
 
@@ -57,7 +59,9 @@ class ZNB20V2(Instrument):
             self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
-        self._visainstrument.term_chars = '\n'
+
+        self._visainstrument.write_termination = '\n'
+        self._visainstrument.read_termination = '\n'
 
         self.add_parameter('frequencyspan',
                            flags       = Instrument.FLAG_GETSET,
@@ -92,6 +96,18 @@ class ZNB20V2(Instrument):
                            units       = 'dBm',
                            maxval      = 30.0,
                            type        = types.FloatType)
+
+        self.add_parameter('startpower',
+                           flags       =Instrument.FLAG_GETSET,
+                           units       ='dBm',
+                           maxval      =30.0,
+                           type        =types.FloatType)
+
+        self.add_parameter('stoppower',
+                           flags       =Instrument.FLAG_GETSET,
+                           units       ='dBm',
+                           maxval      =30.0,
+                           type        =types.FloatType)
 
         self.add_parameter('averages',
                            flags       = Instrument.FLAG_GETSET,
@@ -143,12 +159,14 @@ class ZNB20V2(Instrument):
                            type        = types.StringType)
 
 
+
         self.add_function('get_all')
         self.add_function('reset')
 
         if reset :
 
             self.reset()
+
 
 ###################################################################
 #
@@ -186,6 +204,8 @@ class ZNB20V2(Instrument):
         self.get_startfrequency()
         self.get_stopfrequency()
         self.get_power()
+        self.get_startpower()
+        self.get_stoppower()
         self.get_averages()
         self.get_averagestatus()
         self.get_points()
@@ -193,6 +213,7 @@ class ZNB20V2(Instrument):
         self.get_measBW()
         self.get_status()
         self.get_cwfrequency()
+        self.get_driving_mode()
 
 
 
@@ -201,8 +222,6 @@ class ZNB20V2(Instrument):
 #                           Initialisation
 #
 ###################################################################
-
-
 
     def initialize_one_tone_spectroscopy(self, traces, Sparams):
 
@@ -283,7 +302,6 @@ class ZNB20V2(Instrument):
         if not all([type(Sparam) is str for Sparam in Sparams]):
             raise ValueError('Element in Sparams should be string type')
 
-
         logging.info(__name__ + ' : create trace(s)')
 
         # First we erase memory
@@ -332,7 +350,7 @@ class ZNB20V2(Instrument):
         self._visainstrument.write('calc:parameter:sel "%s"' % (trace))
 
         # Get data as a string
-        val = self._visainstrument.ask('calculate:Data? Sdata')
+        val = self._visainstrument.query('calculate:Data? Sdata')
 
         # Transform the string in a numpy array
         # np.fromstring is faster than np.array
@@ -383,7 +401,7 @@ class ZNB20V2(Instrument):
         logging.info(__name__ +\
                      ' : start to measure and wait till it is finished')
 
-        while self._visainstrument.ask('*ESR?') != '1':
+        while self._visainstrument.query('*ESR?') != '1':
             qt.msleep(0.1)
         else:
 
@@ -429,6 +447,7 @@ class ZNB20V2(Instrument):
 
     def set_trigger(self, trigger='IMM'):
         '''
+
         Define the source of the trigger: IMMediate (free run measurement or
         untriggered), EXTernal, MANual or MULTiple
 
@@ -437,11 +456,13 @@ class ZNB20V2(Instrument):
         Output:
             None
         '''
+
         logging.debug(__name__ +\
         ' : The source of the trigger is set to %s' % trigger)
 
         if trigger.upper() in ('IMM', 'EXT', 'MAN', 'MULT'):
             self._visainstrument.write("TRIG:SOUR '"+str(trigger.upper())+"'")
+
         else:
             raise ValueError('set_trigger(): can only set IMM, EXT, MAN or MULT')
 
@@ -458,12 +479,15 @@ class ZNB20V2(Instrument):
         Output:
             None
         '''
+
         logging.debug(__name__ +\
                       ' : The link of the trigger is set to %s' % link)
+
         if link.upper() in ('SWE', 'SEGM', 'POIN', 'PPO'):
             self._visainstrument.write("TRIG:LINK '"+str(link.upper())+"'")
         else:
             raise ValueError('set_trigger(): can only set  SWE, SEGM, POIN or PPO')
+
 
     def set_sweeptype(self, sweeptype = 'LIN'):
         '''
@@ -483,12 +507,174 @@ class ZNB20V2(Instrument):
         else:
             raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
 
+
 #########################################################
 #
+#           Functions related to Segmented sweeps
+#
+#########################################################
+
+    def define_segment(self, segment_number, startfrequency, stopfrequency, points, power, time, BW ,set_time='dwell'):
+        '''
+        Define a segment indexed by segment_number.
+
+        Input:
+            startfrequency [GHz]= define the frequency at which the segment start
+            stopfrequency [GHz]= define the frequency at which the segment stop
+            points: define the number of points measured
+            power [dBm]: define the power of the VNA
+            time [s]: if set_time==dwell it is a delay for each partial measurement in the segment
+                      if set_time==sweeptime, we define the duration of the sweep in the segment
+            BW [Hz]: define the Bandwidth
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : we are defining the segment number %s' % segment_number)
+
+        # self._visainstrument.write('SEGM%s:DEL' % segment_number)
+        if set_time == 'dwell':
+            self._visainstrument.write('SEGM%s:DEF:SEL DWEL' %segment_number)
+
+            self._visainstrument.write('SEGM%s:DEF %sGHZ,%sGHZ,%s,%sDBM,%sS,%s,%sHZ' \
+                %(segment_number,startfrequency, stopfrequency, points, power, time,0, BW ) )
+            # print self._visainstrument.query('SEGM%s:DEF?' %segment_number)
+
+            ####################################################################
+            # we have to look at the errors checking of freq start and freq stop....
+            ####################################################################
+
+            asked_freq_start = self._visainstrument.query('SEGM%s:FREQ:STAR?'% segment_number)
+            given_freq_start = str(startfrequency*1e9)
+
+            if np.float(asked_freq_start) != np.float(given_freq_start):
+                print'error in setting start frequency at %s' %startfrequency
+                print asked_freq_start, given_freq_start
+                # print self._visainstrument.query('SEGM%s:FREQ:STAR?'% segment_number), unicode('%s' %int(startfrequency*1e9))
+                # print 'set at %s' %freq_start/1e9
+
+            asked_freq_stop = self._visainstrument.query('SEGM%s:FREQ:STOP?'% segment_number)
+            given_freq_stop = str(stopfrequency*1e9)
+
+            if np.float(asked_freq_stop) != np.float(given_freq_stop):
+                print'error in setting stop frequency at %s' %stopfrequency
+                print asked_freq_stop, given_freq_stop
+
+            if self._visainstrument.query('SEGM%s:SWE:POIN?'% segment_number) != unicode('%s' %points):
+                print'error in setting number of points'
+
+            asked_power = self._visainstrument.query('SEGM%s:POW?'% segment_number)
+            given_power = str(power)
+            if np.float(asked_power) != np.float(given_power):
+                print'error in setting power'
+                print asked_power, given_power
+
+                # print np.float(self._visainstrument.query('SEGM%s:POW?'% segment_number)), power
+
+            asked_dwell = self._visainstrument.query('SEGM%s:SWE:DWEL?'% segment_number)
+            given_dwell = str(time)
+            if np.float(asked_dwell) != np.float(given_dwell):
+                print'error in setting dwell time'
+                print asked_dwell, given_dwell
+
+            if self._visainstrument.query('SEGM%s:BWID?'% segment_number)!=unicode('%s' %BW):
+                print'error in setting the bandwidth'
+
+        elif set_time == 'sweeptime':
+            self._visainstrument.write('SEGM%s:DEF:SEL SWT' %segment_number)
+
+            self._visainstrument.write('SEGM%s:DEF %sGHZ,%sGHZ,%s,%sDBM,%sS,%s,%sHZ' \
+                %(segment_number,startfrequency, stopfrequency, points, power, time,0, BW ) )
+
+            if self._visainstrument.query('SEGM%s:FREQ:STAR?'% segment_number) != unicode('%s' %int(startfrequency*1e9)):
+                print'error in setting start frequency at %s' %startfrequency
+                # print 'set at %s' %freq_start/1e9
+
+            if self._visainstrument.query('SEGM%s:FREQ:STOP?'% segment_number)!=unicode('%s' %int(stopfrequency*1e9)):
+                print'error in setting stop frequency at %s' %stopfrequency
+
+            if self._visainstrument.query('SEGM%s:SWE:POIN?'% segment_number)!=unicode('%s' %points):
+                print'error in setting number of points'
+
+            if self._visainstrument.query('SEGM%s:POW?'% segment_number)!=unicode('%s' %power):
+                print'error in setting power'
+
+            if self._visainstrument.query('SEGM%s:SWE:POIN?'% segment_number)!=unicode('%s' %time):
+                print'error in setting dwell time'
+
+            if self._visainstrument.query('SEGM%s:BWID?'% segment_number)!=unicode('%s' %BW):
+                print'error in setting the bandwidth'
+
+        else:
+            print 'set_time should be dweel or sweeptime'
+
+    def define_power_sweep(self, startpow, stoppow, steppow, cwfrequency, BW, time, set_time='dwell'):
+        '''
+        Make a sweep in power where startpow can be greater than stoppow
+
+        Input:
+            startpow [dBm] : define the power at which begin the sweep
+            stoppow [dBm]: define the power at which finish the sweep
+            steppow [dBm]: define the step of the sweep
+            cwfrequency [GHz]: constant wave frequency of the VNA
+            time [s]: if set_time==dwell it is a delay for each partial measurement in the segment
+                      if set_time==sweeptime, we define the duration of the sweep in the segment
+            BW [Hz]: define the Bandwidth
+
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : making a sweep in power from %s to %s with a step of %s' % (startpow, stoppow, steppow))
+
+        #Destroy all the remaining segments from previous measurement
+        self._visainstrument.write('SEGM:DEL:ALL')
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?'))!=0:
+            print 'Error: segments not deleted'
+
+        pow_vec=np.arange(startpow, stoppow + steppow, steppow)
+        point=len(pow_vec)
+        for i in np.arange(point):
+            self.define_segment(i+1, cwfrequency, cwfrequency,1, pow_vec[i],time, BW, set_time )
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?'))!=point:
+            print 'Error: not the number of segment wanted'
+
+    def define_power_sweep_vec(self, pow_vec, cwfrequency, BW, time, set_time='dwell'):
+        '''
+        Define a sweep in power with a power vector.
+
+        Input:
+            pow_vec [dBm] : define the power vector
+            cwfrequency [GHz]: constant wave frequency of the VNA
+            time [s]: if set_time==dwell it is a delay for each partial measurement in the segment
+                      if set_time==sweeptime, we define the duration of the sweep in the segment
+            BW [Hz]: define the Bandwidth
+
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : making a sweep in power' % ())
+
+        #Delete all the remaining segments from previous measurement
+        self._visainstrument.write('SEGM:DEL:ALL')
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?')) != 0:
+            print 'Error: segments not deleted'
+
+        point = len(pow_vec)
+        for i in np.arange(point):
+            self.define_segment(i+1, cwfrequency, cwfrequency,1, pow_vec[i],time, BW, set_time )
+
+        if np.float(self._visainstrument.query('SEGM:COUNT?')) != point:
+            print 'Error: not the number of segment wanted'
+
+
+#########################################################
 #
 #                Frequency
 #
 #########################################################
+
 
     def do_set_centerfrequency(self, centerfrequency = 1.):
         '''
@@ -615,6 +801,7 @@ class ZNB20V2(Instrument):
         logging.info(__name__+' : Get the frequency of the instrument')
         return self._visainstrument.query('frequency:stop?')
 
+
     def do_set_cwfrequency(self, cwfrequency = 1.):
         '''
             Set the CW frequency of the instrument
@@ -643,7 +830,8 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Get the CW frequency of the instrument')
-        return self._visainstrument.ask('SOUR:FREQ:CW?')
+        return self._visainstrument.query('SOUR:FREQ:CW?')
+
 
 #########################################################
 #
@@ -651,7 +839,8 @@ class ZNB20V2(Instrument):
 #
 #########################################################
 
-    def do_set_power(self, power = 0.):
+
+    def do_set_power(self, power = -40.):
         '''
             Set the power of the instrument
 
@@ -683,6 +872,66 @@ class ZNB20V2(Instrument):
 
         logging.info(__name__+' : Get the power of the instrument')
         return self._visainstrument.query('source:power?')
+
+
+    def do_set_startpower(self, startpower=-40.):
+        '''
+            Set the start power of the instrument
+
+            Input:
+                power (float): start power at which the instrument will be tuned [dBm]
+
+            Output:
+                None
+        '''
+
+        logging.info(__name__+' : Set the start power of the instrument')
+        self._visainstrument.write('SOUR:POW:STAR '+str(startpower))
+
+
+    def do_get_startpower(self):
+        '''
+            Get the start power of the instrument
+
+            Input:
+                None
+
+            Output:
+                power (float): start power at which the instrument has been tuned [dBm]
+        '''
+
+        logging.info(__name__+' : Get the start power of the instrument')
+        return self._visainstrument.query('SOUR:POW:STAR?')
+
+    def do_set_stoppower(self, stoppower = -40.):
+        '''
+            Set the stop power of the instrument
+
+            Input:
+                power (float): stop power at which the instrument will be tuned [dBm]
+
+            Output:
+                None
+        '''
+
+        logging.info(__name__+' : Set the stop power of the instrument')
+        self._visainstrument.write('SOUR:POW:STOP '+str(stoppower))
+
+
+    def do_get_stoppower(self):
+        '''
+            Get the stop power of the instrument
+
+            Input:
+                None
+
+            Output:
+                power (float): stop power at which the instrument has been tuned [Hz]
+        '''
+
+        logging.info(__name__+' : Get the stop power of the instrument')
+        return self._visainstrument.query('SOUR:POW:STOP?')
+
 
 #########################################################
 #
@@ -736,7 +985,8 @@ class ZNB20V2(Instrument):
         """
         logging.debug(__name__ + ' : get status')
 
-        stat = self._visainstrument.ask('average?')
+        stat = self._visainstrument.query('average?')
+
         if stat=='1':
           return 'on'
         elif stat=='0':
