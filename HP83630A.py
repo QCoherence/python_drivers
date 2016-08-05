@@ -52,6 +52,8 @@ class HP83630A(Instrument):
         except:
             raise SystemExit
 
+        # Remove the carriage return character from all the visa answer
+        self._visainstrument.read_termination = '\n'
 
         self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=26.5e9, type=types.FloatType)
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval= -20., maxval=25, type=types.FloatType)

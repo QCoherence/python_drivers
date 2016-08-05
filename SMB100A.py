@@ -55,7 +55,7 @@ class SMB100A(Instrument):
 
 
         self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
-        self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', maxval=30.0, type=types.FloatType)
+        self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval=-145, maxval=30.0, type=types.FloatType)
         self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-pi, maxval=pi, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('freqsweep', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
@@ -282,6 +282,50 @@ class SMB100A(Instrument):
 #
 #########################################################
 
+    def set_list(self, name):
+        '''
+    	An empty list with the name of the selected list is created.
+
+
+        Input:
+            status (string): Name of the "list"
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : creates the list  %s' % name)
+
+        self._visainstrument.write('SOUR:LIST:SEL %s'% name)
+
+    def write_list_frequency(self, parameters):
+        '''
+    	Fills the selected list with values
+
+
+        Input:
+            status (string): Elements of the list in MHz
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : fills the selected list with values  ')
+
+        self._visainstrument.write('SOUR:LIST:FREQ %s'% name)
+
+    def set_gui_update(self, update='ON'):
+        '''
+    	The command switches the update of the display on/off.
+        A switchover from remote control to manual control always sets
+        the status of the update of the display to ON.
+
+        Input:
+            status (string): 'on' or 'off'
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : switches the update of the display to  %s' % update)
+
+        self._visainstrument.write('SYST:DISP:UPD %s' % update)
+
+
     def do_set_freqsweep(self, freqsweep='off'):
         '''
     	Set the frequency sweep mode to 'on' or 'off'
@@ -342,7 +386,7 @@ class SMB100A(Instrument):
     	Set the frequency sweep mode
 
         Input:
-            sweepmode (string): AUTO or SINGLE
+            sweepmode (string): AUTO or SINGLE or STEP
         Output:
             None
         '''
@@ -353,8 +397,12 @@ class SMB100A(Instrument):
         elif sweepmode.upper() in ('SINGLE'):
             self._visainstrument.write('SWE:MODE AUTO')
             self._visainstrument.write('TRIG:FSW:SOUR SING')
+        elif sweepmode.upper() in ('STEP'):
+            self._visainstrument.write('SWE:MODE STEP')
+            #self._visainstrument.write('LIST:MODE STEP')
+            self._visainstrument.write('TRIG:FSW:SOUR EXT')
         else:
-            raise ValueError('set_sweepmode(): can only set AUTO or SINGLE')
+            raise ValueError('set_sweepmode(): can only set AUTO or SINGLE or STEP')
 
     def set_spacingfreq(self, spacingfreq='linear'):
         '''
