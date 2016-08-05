@@ -48,7 +48,7 @@ class ZNB20V2(Instrument):
         logging.debug(__name__ + ' : Initializing instrument')
 
         Instrument.__init__(self, name, tags=['physical'])
-        rm = visa.ResourceManager
+        rm = visa.ResourceManager()
 
         self._address = address
 
@@ -66,7 +66,7 @@ class ZNB20V2(Instrument):
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', maxval=30.0, type=types.FloatType)
         self.add_parameter('averages', flags=Instrument.FLAG_GETSET, units='', maxval=100000, type=types.FloatType)
         self.add_parameter('averagestatus', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-        self.add_parameter('points', flags=Instrument.FLAG_GETSET, units='', minval=1, maxval=100000, type=types.FloatType)
+        self.add_parameter('points', flags=Instrument.FLAG_GETSET, units='', minval=1, maxval=100000, type=types.IntType)
         self.add_parameter('sweeps', flags=Instrument.FLAG_GETSET, units='', minval=1, maxval=1000, type=types.FloatType)
         self.add_parameter('measBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=0.1, maxval=500e3, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
@@ -125,6 +125,7 @@ class ZNB20V2(Instrument):
         self.get_measBW()
         self.get_status()
         self.get_cwfrequency()
+        self.get_freqpoints()
 
     def create_trace(self,trace,Sparam):
         '''
@@ -220,7 +221,7 @@ class ZNB20V2(Instrument):
 
     def gettrace(self):
         '''
-        reades a trace from znb
+        reads a trace from znb
 
         Input:
 
@@ -236,12 +237,12 @@ class ZNB20V2(Instrument):
         while self._visainstrument.query('*ESR?') != '1':
             qt.msleep(0.1)
         else:
-			#dstring=self._visainstrument.query('calculate:Data:NSweep? Sdata, 1 ')
-			dstring=self._visainstrument.query('calculate:Data? Sdata')
-			#self._visainstrument.write('init:cont on')
-			dstringclean=dstring.split(';')[0]
-			real,im= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
-			return real+im*1j
+            #dstring=self._visainstrument.query('calculate:Data:NSweep? Sdata, 1 ')
+            dstring=self._visainstrument.query('calculate:Data? Sdata')
+            #self._visainstrument.write('init:cont on')
+            dstringclean=dstring.split(';')[0]
+            real,im= np.reshape(np.array(dstringclean.split(','),dtype=float),(-1,2)).T
+            return real+im*1j
 
     def get2trace(self,trace1,trace2):
         '''
@@ -394,7 +395,47 @@ class ZNB20V2(Instrument):
         else:
             raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
 
-
+    def get_freqpoints(self):
+        '''
+            Gets the frequency points of the sweep using 
+            get_startfrequency and get_stopfrequency.
+            
+            Input:
+                None
+                
+            Output:
+                frequency_points (numpy.array): array with the frequency values of the sweep.
+        '''
+        frequency_points = np.linspace(self.get_startfrequency(),self.get_stopfrequency(),self.get_points())
+        return frequency_points
+        
+    def get_sweeptime(self):
+        '''
+            Gets the time duration of a sweep.
+            
+            Input:
+                None
+                
+            Output:
+                sweep_time (float): sweep duration in seconds.
+        '''
+        
+        sweep_time = self.get_points()/self.get_measBW()
+        return sweep_time
+        
+    def get_sweeptime_averages(self):
+        '''
+            Gets the time duration of a sweep taking into account the average
+            
+            Input:
+                None
+                
+            Output:
+                sweep_time_averages (float): sweep duration times average in seconds
+        '''
+        
+        sweep_time_averages = self.get_sweeptime()*self.get_averages()
+        return sweep_time_averages
 #########################################################
 #
 #                  Write and Read from VISA
@@ -455,7 +496,7 @@ class ZNB20V2(Instrument):
         '''
 
         logging.info(__name__+' : Set the frequency of the instrument')
-        self._visainstrument.write('frequency:span '+str(frequencyspan))
+        self._visainstrument.write('FREQ:SPAN '+str(frequencyspan))
 
 
     def do_get_frequencyspan(self):
@@ -559,6 +600,8 @@ class ZNB20V2(Instrument):
         logging.info(__name__+' : Get the CW frequency of the instrument')
         return self._visainstrument.query('SOUR:FREQ:CW?')
 
+
+        
 #########################################################
 #
 #                Power
@@ -725,7 +768,7 @@ class ZNB20V2(Instrument):
 
 
             Input:
-                power (float): power to which the instrument will be tuned [dBm]
+                points (integer): number of points of the sweep
 
             Output:
                 None
@@ -737,17 +780,17 @@ class ZNB20V2(Instrument):
 
     def do_get_points(self):
         '''
-            Get the pointsof the instrument
+            Get the points of the instrument
 
             Input:
                 None
 
             Output:
 
-                BW (float): power at which the instrument has been tuned [dBm]
+                points (integer): number of points of the sweep
         '''
 
-        logging.info(__name__+' : Get the BW of the instrument')
+        logging.info(__name__+' : Get sweep number of points')
         return self._visainstrument.query('sens:sweep:points?')
 
 #########################################################
