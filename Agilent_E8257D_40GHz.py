@@ -24,7 +24,7 @@ import numpy
 
 class Agilent_E8257D_40GHz(Instrument):
     '''
-    This is the driver for the Agilent E8257D Signal Genarator
+    This is the driver for the Agilent E8257D Signal Generator
 
     Usage:
     Initialize with

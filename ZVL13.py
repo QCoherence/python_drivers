@@ -632,6 +632,7 @@ class ZVL13(Instrument):
         logging.info(__name__+' : Get the sweeps of the instrument')
         return self._visainstrument.query('sens:sweep:count?')
 
+
 #########################################################
 #
 #
@@ -677,3 +678,45 @@ class ZVL13(Instrument):
         else:
             raise ValueError('set_status(): can only set on or off')
         self._visainstrument.write('output %s' % status)
+        
+#########################################################
+#
+#
+#                Methods
+#
+#
+#########################################################
+
+    def set_sweeptype(self, sweeptype='LIN'):
+        '''
+    	Define the type of the sweep: LINear | LOGarithmic
+
+        Input:
+            sweeptype (string): LIN, LOG
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : The type of the sweep is set to %s' % sweeptype)
+        if sweeptype.upper() in ('LIN'):
+            self._visainstrument.write('SWE:TYPE LIN')
+        elif sweeptype.upper() in ('LOG'):
+            self._visainstrument.write('SWE:TYPE LOG')
+        else:
+            raise ValueError('set_sweeptype(): can only set LIN, LOG')
+            
+            
+    def set_trigger(self, trigger='IMM'):
+        '''
+    	Define the source of the trigger: IMMediate (free run measurement or untriggered), EXTernal
+        Input:
+            trigger (string): IMM, EXT 
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : The source of the trigger is set to %s' % trigger)
+        if trigger.upper() in ('IMM'):
+            self._visainstrument.write('TRIG:SOUR IMM')
+        elif trigger.upper() in ('EXT'):
+            self._visainstrument.write('TRIG:SOUR EXT')
+        else:
+            raise ValueError('set_trigger(): can only set IMM, EXT')
