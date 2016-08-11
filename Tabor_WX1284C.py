@@ -132,7 +132,7 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('amplitude', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
-            minval=0.05, maxval=2, units='Volts')
+            minval=0.05, maxval=4, units='Volts')
         self.add_parameter('offset', type=types.FloatType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 4), channel_prefix='ch%d_',
@@ -149,6 +149,18 @@ class Tabor_WX1284C(Instrument):
         self.add_parameter('marker_status_3_4', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1,2), channel_prefix='m%d_')
+        self.add_parameter('marker_width_1_2', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1,2), channel_prefix='m%d_')
+        self.add_parameter('marker_width_3_4', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1,2), channel_prefix='m%d_')
+        self.add_parameter('marker_delay_1_2', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1,2), channel_prefix='m%d_')
+        self.add_parameter('marker_delay_3_4', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1,2), channel_prefix='m%d_')
         # self.add_parameter('numpoints', type=types.IntType,
             # flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             # minval=192, maxval=16e9, units='Int')
@@ -160,8 +172,17 @@ class Tabor_WX1284C(Instrument):
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
             channels=(1, 2), channel_prefix='m%d_',
             minval=0.5, maxval=1.2, units='Volts')
+        self.add_parameter('marker_position_1_2', type=types.FloatType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1, 2), channel_prefix='m%d_')
+        self.add_parameter('marker_position_3_4', type=types.FloatType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1, 2), channel_prefix='m%d_')
         self.add_parameter('trace_mode', type=types.StringType,
             flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET)
+        self.add_parameter('type_waveform', type=types.StringType,
+            flags=Instrument.FLAG_GETSET | Instrument.FLAG_GET_AFTER_SET,
+            channels=(1, 4),channel_prefix='ch%d_')
         # Add functions #######################################################
         self.add_function('clean_visa_open')
         self.add_function('reset')
@@ -182,6 +203,25 @@ class Tabor_WX1284C(Instrument):
         self.get_all()
 
     # Functions ###############################################################
+    def delete_segments(self):
+        '''
+        This command will delete all predefined segments and will clear the entire
+        waveform memory space. This command is particularly important in case
+        you want to defragment the entire waveform memory and start building
+        your waveform segments from scratch.
+
+        Input:
+            None
+
+        Output:
+            None
+        '''
+        logging.info(__name__ + ' : Deleting wveform memory')
+        for i in [1,2,3,4]:
+            self.channel_select(i)
+            self._visainstrument.write('TRAC:DEL:ALL')
+
+
     def clean_visa_open(self):
         '''
         Opens a visa session with the proper parameters
@@ -349,7 +389,8 @@ class Tabor_WX1284C(Instrument):
 
     def send_waveform(self, buffer, ch_id, seg_id):
         '''
-        Sets the active waveform segment seg_id at the output connector ch_id and then download the waveform data buffer to the WX2184C waveform memory.
+        Sets the active waveform segment seg_id at the output connector ch_id
+        and then download the waveform data buffer to the WX2184C waveform memory.
         Inputs:
             buffer: the binary data buffer.
             ch_id (int): channel index. Valid values are 1, 2, 3 and 4.
@@ -364,7 +405,76 @@ class Tabor_WX1284C(Instrument):
         err_code = self.download_binary_data(":TRAC:DATA",  buffer, len(buffer) * buffer.itemsize)
         return err_code
 
+    def segment_select(self,ch_id,seg_id):
+        '''
+        Sets the active segment seg_id at the output connector ch_id
+        '''
+        self.channel_select(ch_id)
+        self._visainstrument.write('TRAC:SEL {}'.format(seg_id))
+
+
     #Parameters ###############################################################
+
+    def do_get_type_waveform(self,channel=1):
+        '''
+        Use this command to query the type of waveform that will be available at the output connector.
+        This command will affect the WX2184C only when the standard waveforms output has been programmed.
+        Select the standard waveforms using the func:mode fix command.
+
+        Input:
+            channel (string): Channel ID
+
+        Output:
+            "SINusoid"  The built-in sine waveform is selected.
+            "TRIangle"  The built-in triangular waveform is selected.
+            "SQUare"    The built-in square waveform is selected.
+            "RAMP"      The built-in ramp waveform is selected.
+            "SINC"      The built-in sinc waveform is selected.
+            "EXPonential" The built-in exponential waveform is selected.
+            "GAUSsian"     The built-in gaussian waveform is selected.
+            "DC" The built-in DC waveform is selected.
+            "NOISe" The built-in noise waveform is selected.
+        '''
+        logging.info( __name__ +' : Getting the waveform of channel {0:d}'.format(channel))
+        # Select channel
+        self.channel_select(channel)
+        # Set it to 'User-Mode'
+        return self._visainstrument.query(":FUNC:SHAP ?")
+
+    def do_set_type_waveform(self,waveform,channel=1):
+        '''
+        Use this command to set the type of waveform that will be available at the output connector.
+        This command will affect the WX2184C only when the standard waveforms output has been programmed.
+        Select the standard waveforms using the func:mode fix command.
+
+        Input:
+            channel (string): Channel ID
+            "SINusoid"  The built-in sine waveform is selected.
+            "TRIangle"  The built-in triangular waveform is selected.
+            "SQUare"    The built-in square waveform is selected.
+            "RAMP"      The built-in ramp waveform is selected.
+            "SINC"      The built-in sinc waveform is selected.
+            "EXPonential" The built-in exponential waveform is selected.
+            "GAUSsian"     The built-in gaussian waveform is selected.
+            "DC" The built-in DC waveform is selected.
+            "NOISe" The built-in noise waveform is selected.
+        Output:
+            NONE
+        '''
+        logging.info( __name__ +' : Setting the waveform of channel {0:d}'.format(channel))
+        # Select channel
+        self.channel_select(channel)
+        # Set it to 'User-Mode'
+        if waveform.upper() in ('SIN','TRI','SQU','RAMP','SINC','EXP','GAUS','DC','NOIS'):
+            self._visainstrument.write('FUNC:SHAP {}'.format(waveform))
+            if self._visainstrument.query('FUNC:SHAP?') != waveform:
+                logging.info('Instrument did not select the output waveform correctly')
+        else:
+            logging.info('The invalid value {} was sent to waveform method'.format(waveform))
+
+            raise ValueError('The invalid value {} was sent to waveform method. Valid values are \'SIN\',\'TRI\',\'SQU\',\'RAMP\',\'SINC\',\'EXP\',\'GAUS\',\'DC\',\'NOIS\'.'.format(waveform))
+
+
     def do_get_func_mode(self):
         '''
         Gets the function mode of the instrument
@@ -580,7 +690,7 @@ class Tabor_WX1284C(Instrument):
 
     def do_set_trigger_timer_time(self, period):
         '''
-            Use this command to set or query the period of the internal timed
+            Use this command to set the period of the internal timed
             trigger generator. This value is associated with the internal
             trigger run mode only and has no effect on other trigger modes.
             The internal trigger generator is a free-running oscillator,
@@ -597,9 +707,11 @@ class Tabor_WX1284C(Instrument):
         logging.info( '{} : Setting the trigger timer time to {}'.format(__name__,period))
         self._visainstrument.write(':TRIG:TIM:TIME '+str(period*1e-6))
 
-        if float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6 != period:
+        if round(float(self._visainstrument.query(':TRIG:TIM:TIME?'))*1e6,0) != round(period,0):
             logging.info('Trigger timer time was not set properly')
             raise ValueError('Trigger timer time was not set properly')
+
+
 
     def do_set_output(self, state='ON', channel=1):
         '''
@@ -812,7 +924,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('The invalid value %s was sent to set_clock_freq' % freq)
             raise ValueError('The invalid value %s was sent to set_clock_freq. Valid values are from 10 to 1250 MHz with 8-digits precision.' % freq)
 
-    def do_set_amplitude(self, amp, channel=1):
+    def do_set_amplitude(self, amp, channel):
         '''
         Sets the amplitude of the channel.
         Input:
@@ -822,13 +934,17 @@ class Tabor_WX1284C(Instrument):
         '''
         logging.info( __name__+ ': Setting the amplitude of the channel %s to %s.' %( channel, amp))
 
-
         self.channel_select(channel)
-        self._visainstrument.write('VOLT:AMPL %s'% amp)
-        if self._visainstrument.query('VOLT:AMPL ?') != amp:
-            logging.info('The amplitude wasn\'t set properly')
+        if self.do_get_coupling(channel) == 'HV':
+            self._visainstrument.write('VOLT:AMPL:HV %s'% amp)
+            if self._visainstrument.query('VOLT:AMPL:HV ?') != amp:
+                logging.info('The amplitude wasn\'t set properly')
+        else:
+            self._visainstrument.write('VOLT:AMPL:DC %s'% amp)
+            if self._visainstrument.query('VOLT:AMPL:DC ?') != amp:
+                logging.info('The amplitude wasn\'t set properly')
 
-    def do_get_amplitude(self, channel=1):
+    def do_get_amplitude(self, channel):
         '''
         Gets the amplitude of a channel.
         Input:
@@ -841,7 +957,10 @@ class Tabor_WX1284C(Instrument):
 
 
         self.channel_select(channel)
-        return self._visainstrument.query('VOLT:AMPL ?')
+        if self.do_get_coupling(channel) == 'HV':
+            return self._visainstrument.query('VOLT:AMPL:HV ?')
+        else:
+            return self._visainstrument.query('VOLT:AMPL ?')
 
     def do_set_offset(self, offset, channel=1):
         '''
@@ -960,7 +1079,7 @@ class Tabor_WX1284C(Instrument):
 
     def do_set_marker_status_1_2(self, status, channel=1):
         '''
-        Gets the status of the marker numbered "channel" of the channel 1 or 2.
+        sets the status of the marker numbered "channel" of the channel 1 or 2.
         Input:
             channel (int): number of the marker. Valid values are 1, 2.
             status (1 or 0): 1 means the marker output is ON, 0 means it is OFF.
@@ -1007,14 +1126,14 @@ class Tabor_WX1284C(Instrument):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number of the channel for this marker. Valid values are 3, 4.')
+            logging.info('Wrong number of the channel for this marker. Valid values are 1, 2.')
 
 
         return self._visainstrument.query('MARK:STAT ?')
 
     def do_set_marker_status_3_4(self, status, channel=1):
         '''
-        Gets the status of the marker numbered "channel" of the channel 3 or 4.
+        sets the status of the marker numbered "channel" of the channel 3 or 4.
         Input:
             channel (int): number of the marker. Valid values are 1, 2.
             status (1 or 0): 1 means the marker output is ON, 0 means it is OFF.
@@ -1032,9 +1151,11 @@ class Tabor_WX1284C(Instrument):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number of the channel for this marker. Valid values are 3, 4.')
+            logging.info('Wrong number of the channel for this marker. Valid values are 1, 2.')
 
-        self._visainstrument.write('MARK:STAT %s' %status )
+        self._visainstrument.write('MARK:STAT %s' % status )
+        print status
+        print self._visainstrument.query('MARK:STAT ?')
         if self._visainstrument.query('MARK:STAT ?') != status:
             logging.info('The instrument didn\'t set properly the status %s' % status)
             raise ValueError('The instrument  didn\'t set properly the status %s by set_marker_status' % status)
@@ -1077,6 +1198,7 @@ class Tabor_WX1284C(Instrument):
         logging.info( __name__+ ': Setting the marker high level of the marker %s of the channel 1_2 to %s.' % (channel, high_level))
 
 
+
         if self._visainstrument.query('INST:SEL?') not in (1,2):
             self.channel_select(1)
         if channel in Mark_num:
@@ -1089,7 +1211,7 @@ class Tabor_WX1284C(Instrument):
             logging.info('Wrong number of the channel for the marker. Valid values are 1,2.')
 
         self._visainstrument.write('MARK:VOLT:HIGH %s' % high_level)
-        if self._visainstrument.query('MARK:VOLT:HIGH?') != high_level:
+        if np.float(self._visainstrument.query('MARK:VOLT:HIGH?')) != high_level:
             logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
             raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
 
@@ -1140,12 +1262,385 @@ class Tabor_WX1284C(Instrument):
                 logging.info('Instrument did not select the marker correctly')
                 raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
         else:
-            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
 
         self._visainstrument.write('MARK:VOLT:HIGH %s' % high_level)
-        if self._visainstrument.query('MARK:VOLT:HIGH ?') != high_level:
+        if np.float(self._visainstrument.query('MARK:VOLT:HIGH ?')) != high_level:
             logging.info('The instrument didn\'t set properly the high_level %s' % high_level)
             raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_high' % high_level)
+
+    def do_get_marker_position_1_2(self, channel=1):
+        '''
+        Gets the position of the marker output.
+        The position is defined from the waveform first point in units of waveform points (sample clock periods).
+        Input:
+            None.
+
+        Output:
+            The WX2184C will return the present marker position value in units of waveform points.
+        '''
+
+        logging.info( __name__+ ': Getting the marker position of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(2)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        return self._visainstrument.query('MARK:POS ?')
+
+    def do_set_marker_position_1_2(self,position, channel=1):
+        '''
+        Sets the position of the marker output.
+        The position is defined from the waveform first point in units of waveform points (sample clock periods).
+        Will set marker position relative to the waveform start point in units of waveform points. The position range is
+        from 0 to the last point of the waveform, minus 4. You can program the position with increments of 2 points.
+        Input:
+            position (int): position of the marker in units of wave form points
+
+        Output:
+            NONE
+        '''
+
+        logging.info( __name__+ ': Setting the marker position of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(1)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        self._visainstrument.write('MARK:POS %i' % position)
+        if np.int_(self._visainstrument.query('MARK:POS ?')) != np.int_(position):
+            logging.info('The instrument didn\'t set properly the position %s' % position)
+            raise ValueError('The instrument  didn\'t set properly the position %s by set_marker_position' % position)
+
+
+    def do_get_marker_position_3_4(self, channel=1):
+        '''
+        Gets the position of the marker output.
+        The position is defined from the waveform first point in units of waveform points (sample clock periods).
+        Input:
+            None.
+
+        Output:
+            The WX2184C will return the present marker position value in units of waveform points.
+        '''
+
+        logging.info( __name__+ ': Getting the marker position of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+
+        return self._visainstrument.query('MARK:POS ?')
+
+    def do_set_marker_position_3_4(self,position, channel=1):
+        '''
+        Sets the position of the marker output.
+        The position is defined from the waveform first point in units of waveform points (sample clock periods).
+        Will set marker position relative to the waveform start point in units of waveform points. The position range is
+        from 0 to the last point of the waveform, minus 4. You can program the position with increments of 2 points.
+        Input:
+            position (int): position of the marker in units of wave form points
+
+        Output:
+            NONE
+        '''
+
+        logging.info( __name__+ ': Setting the marker position of the marker %s of the channel 3_4.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        self._visainstrument.write('MARK:POS  %i' % position)
+        if np.int_(self._visainstrument.query('MARK:POS ?')) != np.int_(position):
+            logging.info('The instrument didn\'t set properly the position %s' % position)
+            raise ValueError('The instrument  didn\'t set properly the position %s by set_marker_position' % position)
+
+    def do_set_marker_width_1_2(self,width, channel=1):
+        '''
+        Use this command to set the width of the
+        marker output. The width is defined in units of waveform points (sample clock periods).
+        Will set marker width in units of waveform points. The width range is from 0 to the last
+        point of the waveform less 4. You can program the width in increments of 2 points. Note
+        that you can program D14 and D15 to create multiple markers along the waveform length however,
+        in this case, you must remove the default marker from the waveform map by setting the width
+        parameter mark:wid 0.
+        Input:
+            width (int): width of the marker in units of wave form points. Minium 2.
+                         Default:4
+
+        Output:
+            NONE
+        '''
+
+        logging.info( __name__+ ': Setting the marker width of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(1)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        self._visainstrument.write('MARK:WIDTH %i' % np.int_(width))
+        if self._visainstrument.query('MARK:WIDTH ?') != width:
+            logging.info('The instrument didn\'t set properly the width %s' % width)
+            raise ValueError('The instrument  didn\'t set properly the width %s by set_marker_width' % width)
+
+
+    def do_get_marker_width_1_2(self, channel=1):
+        '''
+        Use this command to query the width of the
+        marker output. The width is defined in units of waveform points (sample clock periods).
+        Will set marker width in units of waveform points. The width range is from 0 to the last
+        point of the waveform less 4. You can program the width in increments of 2 points. Note
+        that you can program D14 and D15 to create multiple markers along the waveform length however,
+        in this case, you must remove the default marker from the waveform map by setting the width
+        parameter mark:wid 0.
+        Input:
+            NONE
+
+        Output (int): width of the marker in units of wave form points. Minium 2.
+                     Default:4
+            NONE
+        '''
+
+        logging.info( __name__+ ': Setting the marker width of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(1)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        return self._visainstrument.query('MARK:WIDTH ?')
+
+
+    def do_set_marker_width_3_4(self,width, channel=1):
+        '''
+        Use this command to set the width of the
+        marker output. The width is defined in units of waveform points (sample clock periods).
+        Will set marker width in units of waveform points. The width range is from 0 to the last
+        point of the waveform less 4. You can program the width in increments of 2 points. Note
+        that you can program D14 and D15 to create multiple markers along the waveform length however,
+        in this case, you must remove the default marker from the waveform map by setting the width
+        parameter mark:wid 0.
+        Input:
+            width (int): width of the marker in units of wave form points. Minium 2.
+                         Default:4
+
+        Output:
+            NONE
+        '''
+
+        logging.info( __name__+ ': Setting the marker width of the marker %s of the channel 3_4.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        self._visainstrument.write('MARK:WIDTH %i' % np.int_(width))
+        if self._visainstrument.query('MARK:WIDTH ?') != width:
+            logging.info('The instrument didn\'t set properly the width %s' % width)
+            raise ValueError('The instrument  didn\'t set properly the width %s by set_marker_width' % width)
+
+    def do_get_marker_width_3_4(self, channel=1):
+        '''
+        Use this command to query the width of the
+        marker output. The width is defined in units of waveform points (sample clock periods).
+        Will set marker width in units of waveform points. The width range is from 0 to the last
+        point of the waveform less 4. You can program the width in increments of 2 points. Note
+        that you can program D14 and D15 to create multiple markers along the waveform length however,
+        in this case, you must remove the default marker from the waveform map by setting the width
+        parameter mark:wid 0.
+        Input:
+            NONE
+
+        Output (int): width of the marker in units of wave form points. Minium 2.
+                     Default:4
+            NONE
+        '''
+
+        logging.info( __name__+ ': Setting the marker width of the marker %s of the channel 3_4.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+
+        return self._visainstrument.query('MARK:WIDTH ?')
+
+    def do_get_marker_delay_1_2(self, channel=1):
+        '''
+        Use this command to query the delay
+        of the marker output of channel 1_2. The delay is measured from the sync output in units of seconds.
+        Input:
+            NONE
+
+        Output (float): marker delay value in units of seconds. RAnge: 0 to 3e-9
+
+        '''
+
+        logging.info( __name__+ ': Setting the marker delay of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(1)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        return self._visainstrument.query('MARK:DEL ?')
+
+    def do_set_marker_delay_1_2(self, delay,channel=1):
+        '''
+        Use this command to set the delay
+        of the marker output of channel 1_2. The delay is measured from the sync output in units of seconds.
+        Input:
+            NONE
+
+        Output (float): marker delay value in units of seconds, Range: 0 to 3e-9
+
+        '''
+
+        logging.info( __name__+ ': Setting the marker delay of the marker %s of the channel 1_2.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (1,2):
+            self.channel_select(1)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 1, 2.')
+
+        self._visainstrument.write('MARK:DEL %s' % delay)
+        if np.float(self._visainstrument.query('MARK:DEL ?')) !=np.float(delay) :
+            logging.info('The instrument didn\'t set properly the delay %s' % delay)
+            raise ValueError('The instrument  didn\'t set properly the high_level %s by set_marker_delay' % delay)
+
+    def do_set_marker_delay_3_4(self, delay,channel=1):
+        '''
+        Use this command to set the delay
+        of the marker output of channel 1_2. The delay is measured from the sync output in units of seconds.
+        Input:
+            NONE
+
+        Output (float): marker delay value in units of seconds, Range: 0 to 3e-9
+
+        '''
+
+        logging.info( __name__+ ': Setting the marker delay of the marker %s of the channel 3_4.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+
+        self._visainstrument.write('MARK:DEL %s' % delay)
+        if np.float(self._visainstrument.query('MARK:DEL ?')) !=np.float(delay) :
+            logging.info('The instrument didn\'t set properly the delay %s' % delay)
+            raise ValueError('The instrument  didn\'t set properly the delay %s by set_marker_delay' % delay)
+
+    def do_get_marker_delay_3_4(self, channel=1):
+        '''
+        Use this command to query the delay
+        of the marker output of channel 3_4. The delay is measured from the sync output in units of seconds.
+        Input:
+            NONE
+
+        Output (float): marker delay value in units of seconds. Range: 0 to 3e-9
+
+        '''
+
+        logging.info( __name__+ ': Setting the marker delay of the marker %s of the channel 3_4.' % (channel))
+
+
+        if self._visainstrument.query('INST:SEL?') not in (3,4):
+            self.channel_select(3)
+        if channel in Mark_num:
+            self._visainstrument.write('MARK:SEL{0:d}'.format(channel))
+
+            if self._visainstrument.query('MARK:SEL?') != '{0:d}'.format(channel):
+                logging.info('Instrument did not select the marker correctly')
+                raise ValueError('The marker {0:d} was not properly selected.'.format(channel))
+        else:
+            logging.info('Wrong number of the channel for the marker. Valid values are 3, 4.')
+
+        return self._visainstrument.query('MARK:DEL ?')
 
     def do_get_trace_mode(self):
         '''
@@ -1320,7 +1815,8 @@ class Tabor_WX1284C(Instrument):
             start_point = (start_point // MARKER_QUANTUM) * MARKER_QUANTUM
             len_in_pts = (len_in_pts // MARKER_QUANTUM) * MARKER_QUANTUM
 
-        intervals = self._normalize_interval(start_point, len_in_pts)
+        # intervals = self._normalize_interval(start_point, len_in_pts)
+        intervals= np.arange(start_point,start_point+len_in_pts, MARKER_QUANTUM)
         self._add_extra_data(ex_dat, intervals)
 
     def _normalize_interval(self, intrv_start, intrv_len):
@@ -1463,18 +1959,22 @@ class Tabor_WX1284C(Instrument):
 
         self._sub_lin_segs = new_sub_segs
 
-    def add_markers_mask(self, marker_idx, offset, length, dat_buff, dat_buff_start_offs):
+    def add_markers_mask(self, marker_idx, offset, length, dat_buff):
         """
-        Add markers mask to given buffer of wave-data.
+        Add markers mask to given buffer of wave-data and returns the new buffer data.
+        The marker resolution are two wave points. Odd number of wave points are rounded.
+        Marker positions are programmed on channel 1 or 3.
         Inputs:
             marker_idx (int): index of the marker. Valid values are 1 or 2.
             offset (): offset on the position of the marker
             length (): length or width of the marker signal. Had to be superior or egual to 2.
             dat_buff : the given buffer of wave data
-            dat_buff_start_offs: offset on the
+
         Output:
-            None
+            returns the modified buffer of wave data containing the marker positions
         """
+
+
         mask = 0
         # |= takes the hexidecimal value into a decimal value.
         if marker_idx == 1:
@@ -1482,23 +1982,25 @@ class Tabor_WX1284C(Instrument):
         if marker_idx == 2:
             mask |= _EX_DAT_M2_MASK_NICO
 
-        # // takes the integer part of the division.
-        offset = long(offset // MARKER_QUANTUM)
-        length = long(length // MARKER_QUANTUM)
-
         if mask == 0 or length == 0:
             print('''Wrong value of marker_idx or length. The marker_idx has to be 1 or 2. length should be superior or egal to 2 ?''')
             # you should verify the assertion on length
             return
+        # % returns the modulo of the division
+        if offset %2 !=0:
+            offset=offset-1
+        if length %2 !=0:
+            length=length-1
 
-        # % takes the modulo
-        k = long(dat_buff_start_offs)
-        j = (offset // octet) * number_of_bits + (offset % octet) # j is a multiple of 16 or one of the seven following value of the multiple.
-        m = octet
-        for i in range(j, j + length):
-            if i % number_of_bits == 0:
-                m += octet
-            dat_buff[k + i + m] |= mask
+        marker_points=length/2 # number of marker points to be programmed as one marker point hase size of 2 wave form points
+
+        for i in range(0, marker_points):
+
+            k=8*(np.int(offset/16)+1)+offset/2 # encodes marker position in the last 8 words of a 16 word data block
+            offset=offset+2
+            dat_buff[k] = mask+dat_buff[k]
+
+        return dat_buff
 
     def seq_mode(self, value='STEP'):
         """
@@ -1558,6 +2060,7 @@ class Tabor_WX1284C(Instrument):
         where n is the number of the first one (i.e. `n = first_seg_nb`).
         Inputs:
             buffer: 2D numpy.array of the sequence formated in the following way [[loop,segment#,jum_flag],[loop,segment#,jum_flag],...]
+
         Output:
             m: a `numpy.array` (of bytes) with the wvf's steps-info.
         """
@@ -1592,3 +2095,11 @@ class Tabor_WX1284C(Instrument):
         buff=self.create_wvf_steps_info_buff(buffer)
         # and download the sequence info ..
         self.download_binary_data(":SEQ:DATA", buff, len(buff) * buff.itemsize)
+
+    def query(self, cmd):
+        res= self._visainstrument.query(cmd + '?')
+        print res
+        return res
+
+    def tell(self, cmd):
+        self._visainstrument.write(cmd)

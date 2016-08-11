@@ -514,7 +514,7 @@ class ATS9360_NPT(Instrument):
             self.buffers_per_acquisition = 1
             self.records_per_buffer      = int(nb_averaging*self.nb_sequence)
         else:
-            self.buffers_per_acquisition = int(np.ceil(nb_averaging*self.nb_sequence/self.records_per_buffer))
+            self.buffers_per_acquisition = int(np.ceil(float(nb_averaging*self.nb_sequence)/self.records_per_buffer))
 
         if output:
             m  = 'buffer per acquisition:', self.buffers_per_acquisition
@@ -559,7 +559,7 @@ class ATS9360_NPT(Instrument):
         if nb_sequence%2:
             raise ValueError('The number of sequence should be even')
 # ****************** previous code -->
-        # # Number of averaging
+        # Number of averaging
         # nb_averaging = self.buffers_per_acquisition*self.records_per_buffer\
         #                /self.nb_sequence
         #
@@ -572,11 +572,11 @@ class ATS9360_NPT(Instrument):
         #
         # self.nb_sequence = nb_sequence
 # ******************** <--
-        if nb_sequence<251:
+        if nb_sequence<(self.default_records_per_buffer +1):
             self.records_per_buffer         = int(nb_sequence)
             self.nb_sequence = int(nb_sequence)
         else:
-            self.records_per_buffer         = 250
+            self.records_per_buffer         = self.default_records_per_buffer
             self.nb_sequence = int(nb_sequence)
 
         if output:

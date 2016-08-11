@@ -155,6 +155,7 @@ class DataTreatment(object):
                             queue_treatment, parameters)
 
                 self.data_stored = data[parameters['nb_sequence'] - self.data_stored.shape[0]:]
+                self.treated_sequance += 1
 
 
 
@@ -234,7 +235,6 @@ class Raw(DataTreatment):
     def process(self, data, queue_treatment, parameters):
 
         self.data = np.append(self.data, data)
-
         queue_treatment.put(self.data)
 
 
