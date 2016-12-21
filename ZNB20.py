@@ -25,7 +25,7 @@ import types
 from numpy import pi
 import numpy as np
 
-class ZNB20V2(Instrument):
+class ZNB20(Instrument):
     '''
     This is the python driver for the ZNB20
 
@@ -318,7 +318,7 @@ class ZNB20V2(Instrument):
 
         # Second we display all traces
         for i, trace in enumerate(traces):
-            self._visainstrument.write('disp:wind1:trac%s:feed "%s"
+            self._visainstrument.write('disp:wind1:trac%s:feed "%s"'
                                        % (i + 1, trace))
 
         # We set the update od the display on
