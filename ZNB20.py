@@ -268,7 +268,7 @@ class ZNB20(Instrument):
 
     def create_traces(self, traces, Sparams):
         """
-            Create traces in the SNB
+            Create traces in the ZNB
             Input:
                 - traces (tuple): Name of the traces from which we get data.
                                   Should be a tuple of string.
@@ -354,17 +354,17 @@ class ZNB20(Instrument):
 
         # Transform the string in a numpy array
         # np.fromstring is faster than np.array
-        val = np.fromstring(dstring, sep = ',')
+        val = np.fromstring(val, sep = ',')
 
         # Change the shape of the array to get the real an imaginary part
         real, imag = np.transpose(np.reshape(val, (-1, 2)))
 
         if data_format.lower() == 'real-imag':
-            real, imag
+            return real, imag
         elif data_format.lower() == 'db-phase':
-            20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+            return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
         elif data_format.lower() == 'amp-phase':
-            abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
+            return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
         else:
             raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
 
@@ -387,7 +387,7 @@ class ZNB20(Instrument):
                 - Following the data_format input it returns the tupples:
                     (a1, a2), (b1, b2), ...
                     where a1, a2 are the db-phase, by default, of the trace1
-                    and b1, b2 of thr trace2.
+                    and b1, b2 of the trace2.
         """
 
         # We check if traces is tuple type
@@ -461,7 +461,7 @@ class ZNB20(Instrument):
         ' : The source of the trigger is set to %s' % trigger)
 
         if trigger.upper() in ('IMM', 'EXT', 'MAN', 'MULT'):
-            self._visainstrument.write("TRIG:SOUR '"+str(trigger.upper())+"'")
+            self._visainstrument.write("TRIG:SOUR "+str(trigger.upper()))
 
         else:
             raise ValueError('set_trigger(): can only set IMM, EXT, MAN or MULT')
@@ -503,7 +503,7 @@ class ZNB20(Instrument):
                       ' : The type of the sweep is set to %s' % sweeptype)
 
         if sweeptype.upper() in ('LIN', 'LOG', 'POW', 'CW', 'POIN', 'SEG'):
-            self._visainstrument.write("SWE:TYPE '"+str(sweeptype.upper())+"'")
+            self._visainstrument.write("SWE:TYPE "+str(sweeptype.upper()))
         else:
             raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
 

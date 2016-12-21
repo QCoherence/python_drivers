@@ -74,6 +74,7 @@ class HP3245A(Instrument):
         self.add_parameter('channel', flags=Instrument.FLAG_GETSET,  option_list=['A', 'B'], type=types.StringType)
         self.add_parameter('mode', flags=Instrument.FLAG_GETSET, option_list=['dci','dcv'], type=types.StringType)
         self.add_parameter('autorange', flags=Instrument.FLAG_GETSET, option_list=['on','off'], type=types.StringType)
+        self.add_parameter('output_terminal', flags=Instrument.FLAG_GETSET, option_list=['front','rear'], type=types.StringType)
 
         self.add_function('reset')
         self.add_function('clear_mem')
@@ -231,6 +232,31 @@ class HP3245A(Instrument):
             return 'A'
         elif channelInt == 100:
             return 'B'
+
+    def do_set_output_terminal(self, outputTerminal):
+        '''
+            sets the output terminal: front or rear.
+
+            Input:
+                outputTerminal(String): FRONT or REAR
+
+            Output:
+                None
+        '''
+        if str(outputTerminal).lower() == 'front':
+            logging.info(__name__ + ' : set the output terminal to FRONT')
+            self._visainstrument.write('TERM FRONT ')
+        elif str(outputTerminal).lower() == 'rear':
+            logging.info(__name__ + ' : set the output terminal to REAR')
+            self._visainstrument.write('TERM REAR ')
+        else:
+            raise ValueError('The input parameter should be "FRONT" or "REAR".')
+            
+    def do_get_output_terminal(self):
+        '''
+            gets the output terminal, either FRONT or REAR
+        '''
+        return 'Method not implemented due to error (Javier)'
 
 
     def do_set_current(self, currentValue):
