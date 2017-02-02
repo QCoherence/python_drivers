@@ -1,5 +1,5 @@
 # Work in PROGRESS
-# made by Remy Dassonneville in 2016
+# made by Remy Dassonneville in 2016-2017
 
 from instrument import Instrument
 import instruments
@@ -7,7 +7,6 @@ import numpy as np
 import types
 import logging
 
-# Should we put the measurement in the driver???
 # from lib.math import fit # to be able to do some fit during the measurements
 # import ATS9360.DataTreatment as dt
 # import qt
@@ -60,7 +59,7 @@ class virtual_pulsing_instrument(Instrument):
         self._microwave_generator1 = self._instruments.get(mwsrc1)
         self._microwave_generator1.set_power(21)  #microwave generator 1 is used for readout
         self._microwave_generator1.set_status('ON')
-
+        self._microwave_generator1.set_pointsfreq(2)
         self._board = self._instruments.get(board)
 
         # if we import the second microwave generator or not
@@ -149,7 +148,7 @@ class virtual_pulsing_instrument(Instrument):
                             channels=(1, 2),
                             channel_prefix='src%d_')
 
-        self.add_parameter('averaging',
+        self.add_parameter('total_averaging',
                             flags=Instrument.FLAG_GETSET,
                             minval = 1,
                             type=types.FloatType)
@@ -173,7 +172,7 @@ class virtual_pulsing_instrument(Instrument):
                             maxval= 100e-6,
                             units='s',
                             type=types.FloatType)
-        self._firsttone_temp_length = 1e-6
+        self._firsttone_temp_length = 4e-6
 
         self.add_parameter('temp_length_secondtone',
                             flags=Instrument.FLAG_GETSET,
@@ -181,7 +180,7 @@ class virtual_pulsing_instrument(Instrument):
                             maxval= 100e-6,
                             units='s',
                             type=types.FloatType)
-        self._secondtone_temp_length = 0.
+        self._secondtone_temp_length = 20e-6
 
         self.add_parameter('temp_start_firsttone',
                             flags=Instrument.FLAG_GETSET,
@@ -197,7 +196,31 @@ class virtual_pulsing_instrument(Instrument):
                             maxval= 100e-6,
                             units='s',
                             type=types.FloatType)
-        self._secondtone_temp_start = 0.
+        self._secondtone_temp_start = 100e-9
+
+        self.add_parameter('marker1_width',
+                            flags=Instrument.FLAG_GETSET,
+                            units='s',
+                            type=types.FloatType)
+        self._marker1_width = 4e-6
+
+        self.add_parameter('marker2_width',
+                            flags=Instrument.FLAG_GETSET,
+                            units='s',
+                            type=types.FloatType)
+        self._marker2_width = 45e-6
+
+        self.add_parameter('marker1_start',
+                            flags=Instrument.FLAG_GETSET,
+                            units='s',
+                            type=types.FloatType)
+        self._marker1_start = 100e-9
+
+        self.add_parameter('marker2_start',
+                            flags=Instrument.FLAG_GETSET,
+                            units='s',
+                            type=types.FloatType)
+        self._marker2_start = 100e-9
         ########################################################################
         # GET only
         self.add_parameter('SSB_conversion_loss',
@@ -225,30 +248,6 @@ class virtual_pulsing_instrument(Instrument):
                             type=types.FloatType)
         self._down_converted_frequency = 0.08
 
-        self.add_parameter('marker1_width',
-                            flags=Instrument.FLAG_GET,
-                            units='s',
-                            type=types.FloatType)
-        self._marker1_width = 80e-6
-
-        self.add_parameter('marker2_width',
-                            flags=Instrument.FLAG_GET,
-                            units='s',
-                            type=types.FloatType)
-        self._marker2_width = 80e-6
-
-        self.add_parameter('marker1_start',
-                            flags=Instrument.FLAG_GET,
-                            units='s',
-                            type=types.FloatType)
-        self._marker1_start = 100e-9
-
-        self.add_parameter('marker2_start',
-                            flags=Instrument.FLAG_GET,
-                            units='s',
-                            type=types.FloatType)
-        self._marker2_start = 100e-9
-
         self.add_parameter('mw_security_time',
                             flags=Instrument.FLAG_GET,
                             units='s',
@@ -267,6 +266,7 @@ class virtual_pulsing_instrument(Instrument):
         acq_time = np.int(acq_time/128)*128
         # print acq_time
         self._board.set_acquisition_time(acq_time)
+        self._board.set_averaging(2)
 
         # initialize awg
         self._arbitrary_waveform_generator.set_ref_freq(10)
@@ -289,11 +289,13 @@ class virtual_pulsing_instrument(Instrument):
                                    2:self._arbitrary_waveform_generator.set_ch2_output,
                                    3:self._arbitrary_waveform_generator.set_ch3_output,
                                    4:self._arbitrary_waveform_generator.set_ch4_output }
+
+        print self._arbitrary_waveform_generator.get_ch1_amplitude()
         for i in CHANNEL:
             self._awg_dict_coupling[i]('DC')
             self._awg_dict_amplitude[i](2)
             self._awg_dict_output[i]('OFF')
-
+        print self._arbitrary_waveform_generator.get_ch1_amplitude()
         self._awg_waves = {1:[], 2:[], 3:[], 4:[] }
         #initialize the mw generators
         if self._presence_mwsrc2:
@@ -317,7 +319,7 @@ class virtual_pulsing_instrument(Instrument):
         #                       Functions
         ########################################################################
         self.add_function('write_onetone_pulsessequence')
-        self.add_function('measure_onetone')
+        # self.add_function('measure_onetone')
 
         self.add_function('cos')
         self.add_function('volt2bit')
@@ -404,15 +406,15 @@ class virtual_pulsing_instrument(Instrument):
             freq_start -= self._awg_routing['mw1_ssb_bandtype']*self.get_down_converted_frequency()
             self._microwave_generator1.set_startfreq(freq_start)
 
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator1.get_pointsfreq()
-            self._board.set_nb_sequence(number_sequence)
+            # number_sequence = self.get_pulsenumber_averaging()*self._microwave_generator1.get_pointsfreq()
+            # self._board.set_nb_sequence(number_sequence)
 
         elif channel == 2:
             freq_start -= self._awg_routing['mw2_ssb_bandtype']*self.get_down_converted_frequency()
             self._microwave_generator2.set_startfreq(freq_start)
 
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator2.get_pointsfreq()
-            self._board.set_nb_sequence(number_sequence)
+            # number_sequence = self.get_pulsenumber_averaging()*self._microwave_generator2.get_pointsfreq()
+            # self._board.set_nb_sequence(number_sequence)
         else:
             print 'Error: channel should be in (1, 2)'
 
@@ -439,14 +441,14 @@ class virtual_pulsing_instrument(Instrument):
             freq_stop -= self._awg_routing['mw1_ssb_bandtype']*self.get_down_converted_frequency()
             self._microwave_generator1.set_stopfreq(freq_stop)
 
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator1.get_pointsfreq()
-            self._board.set_nb_sequence(number_sequence)
+            # number_sequence = self.get_pulsenumber_averaging()*self._microwave_generator1.get_pointsfreq()
+            # self._board.set_nb_sequence(number_sequence)
         elif channel == 2:
             freq_stop -= self._awg_routing['mw2_ssb_bandtype']*self.get_down_converted_frequency()
             self._microwave_generator2.set_stopfreq(freq_stop)
 
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator2.get_pointsfreq()
-            self._board.set_nb_sequence(number_sequence)
+            # number_sequence = self.get_pulsenumber_averaging()*self._microwave_generator2.get_pointsfreq()
+            # self._board.set_nb_sequence(number_sequence)
         else:
             print 'Error: channel should be in (1, 2)'
 
@@ -472,18 +474,19 @@ class virtual_pulsing_instrument(Instrument):
         if channel == 1:
             self._microwave_generator1.set_stepfreq(freq_step)
 
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator1.get_pointsfreq()
-            self._board.set_nb_sequence(number_sequence)
+            # number_sequence = self.get_pulsenumber_averaging()*self._microwave_generator1.get_pointsfreq()
+            # self._board.set_nb_sequence(number_sequence)
         elif channel == 2:
             self._microwave_generator2.set_stepfreq(freq_step)
-
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator2.get_pointsfreq()
-            self._board.set_nb_sequence(number_sequence)
+            #
+            # number_sequence = self.get_pulsenumber_averaging()*self._microwave_generator2.get_pointsfreq()
+            # self._board.set_nb_sequence(number_sequence)
         else:
             print 'Error: channel must be in (1,2)'
 
     def do_get_points_freq_sweep(self, channel=1):
         '''
+        Pb: get_pointsfreq is a not working function
         Get the number of points in frequency of the frequency sweep in GHz of the microwave generator channel
         '''
         if channel == 1:
@@ -503,30 +506,46 @@ class virtual_pulsing_instrument(Instrument):
         '''
         if channel == 1:
             self._microwave_generator1.set_pointsfreq(points)
-
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator1.get_pointsfreq()
+            # print self.get_pulsenumber_averaging(), type(self.get_pulsenumber_averaging())
+            # print self._microwave_generator1.get_pointsfreq(), type(self._microwave_generator1.get_pointsfreq())
+            number_sequence = np.int(self.get_pulsenumber_averaging()*points)
             self._board.set_nb_sequence(number_sequence)
         elif channel == 2:
             self._microwave_generator2.set_pointsfreq(points)
 
-            number_sequence = self._pulsenumber_averaging*self._microwave_generator1.get_pointsfreq()
+            number_sequence = np.int(self.get_pulsenumber_averaging()*points)
             self._board.set_nb_sequence(number_sequence)
         else:
             print 'Error: channel must be in (1,2)'
 
-    def do_get_averaging(self):
+    def do_get_total_averaging(self):
         '''
         Get the total averaging. It is the board averaging multiply by the number of pulses averaging.
         '''
-        return self._board.get_averaging()*self._pulsenumber_averaging
+        return self._board.get_averaging()*self.get_pulsenumber_averaging()
 
-    def do_set_averaging(self, average):
+    def do_set_total_averaging(self, average):
         '''
         Set the total averaging. It is a multiple of the number of pulses averaging.
         '''
-        if average % self._pulsenumber_averaging == 0:
-            self._board.set_averaging(average/self._pulsenumber_averaging)
+        if average % self.get_pulsenumber_averaging() == 0:
+            if np.int(average/self.get_pulsenumber_averaging()) %2  == 0:
+                self._board.set_averaging(np.int(average/self.get_pulsenumber_averaging()))
+                print 'Board averaging set to:', self._board.get_averaging()
+                print 'Total averaging set to:', self.get_total_averaging()
+            else:
+                self._board.set_averaging(np.int(average/self.get_pulsenumber_averaging()))
+                print 'Board averaging set to:',self._board.get_averaging()
+                print 'Total averaging set to:', self.get_total_averaging()
         else:
+            if np.int(average/self.get_pulsenumber_averaging()) %2  == 0:
+                self._board.set_averaging(np.int(average/self.get_pulsenumber_averaging()))
+                print 'Board averaging set to:', self._board.get_averaging()
+                print 'Total averaging set to:', self.get_total_averaging()
+            else:
+                self._board.set_averaging(np.int(average/self.get_pulsenumber_averaging()))
+                print 'Board averaging set to:',self._board.get_averaging()
+                print 'Total averaging set to:', self.get_total_averaging()
             print 'Error: the total averaging should be a multiple of the number of pulses averaging'
 
     def do_get_routing_awg(self):
@@ -576,8 +595,8 @@ class virtual_pulsing_instrument(Instrument):
         self._firsttone_temp_length = delta_t
 
         acq_time = self._firsttone_temp_length - 0.2e-6
-        acq_time = np.int(acq_time/128)*128
-        self._board.set_acquisition_time(acq_time)
+        acq_time = np.int(1e9*acq_time/128)*128
+        self._board.set_acquisition_time(acq_time) # in ns
 
     def do_get_temp_length_secondtone(self):
         '''
@@ -624,6 +643,7 @@ class virtual_pulsing_instrument(Instrument):
         Get the pulse number averaging
         '''
         return self._pulsenumber_averaging
+
     def do_get_SSB_conversion_loss(self):
         return self._SSB_conver_loss
 
@@ -648,6 +668,18 @@ class virtual_pulsing_instrument(Instrument):
     def do_get_marker2_start(self):
         return self._marker2_start
 
+    def do_set_marker1_width(self, marker1_width):
+        self._marker1_width = marker1_width
+
+    def do_set_marker2_width(self, marker2_width):
+        self._marker2_width = marker2_width
+
+    def do_set_marker1_start(self, marker1_start):
+        self._marker1_start = marker1_start
+
+    def do_set_marker2_start(self, marker2_start):
+        self._marker2_start = marker2_start
+
     def do_get_mw_security_time(self):
         return self._mw_security_time
 
@@ -656,7 +688,7 @@ class virtual_pulsing_instrument(Instrument):
     ############################################################################
     def write_onetone_pulsessequence(self, freq_vec, power, average, readout_channel=1, sequence_index=1):
         '''
-        Putting in the awg memory the onetone pulses sequence.
+        Putting in the awg memory the onetone pulses sequence and reading the others instruments.
         Inputs:
             frec_vec: frequency vector in GHz of the onetone sweep
             power: power at the SSB output in dBm
@@ -664,31 +696,77 @@ class virtual_pulsing_instrument(Instrument):
             readout_channel: awg channel used. Value in (1, 2, 3, 4)
             sequence_index: value in 1 to 1000
         '''
-        # self._pulsenumber_averaging
 
+        self._microwave_generator1.set_freqsweep('on')
+        self._microwave_generator1.set_sweepmode('STEP')
+        self._microwave_generator1.set_spacingfreq('lin')
+        if  self._presence_mwsrc2:
+            self._microwave_generator2.set_freqsweep('off')
+        # if len(freq_vec)
         self.set_src1_frequency_start(freq_vec[0])
         self.set_src1_frequency_stop(freq_vec[-1])
         self.set_src1_points_freq_sweep(len(freq_vec))
 
         self._freq_vec = freq_vec
-        self.set_averaging(average)
+        self.set_total_averaging(average)
 
         power += self.get_SSB_conversion_loss()
         amplitude = np.sqrt(2.*50.*10**((power-30.)/10.))
+        print amplitude
 
-        nb_samples_smb =  round((self.get_marker2_start()+self.get_marker2_width())*self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
+        self.set_marker1_start(100e-9)
+        self.set_temp_start_firsttone(100e-9)
+
+        nb_samples_smb =  round(1.2*(self.get_marker2_start()+self.get_marker2_width())*\
+                self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
         time_smb = np.arange(nb_samples_smb)/self._arbitrary_waveform_generator.get_clock_freq()*1e-6
 
-        self._awg_waves[readout_channel] = []
+        nb_samples =  round((self.get_marker1_start()+self.get_marker1_width()+\
+                self.get_temp_start_firsttone()+self.get_temp_length_firsttone() )*\
+                self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
+        time = np.arange(nb_samples)/self._arbitrary_waveform_generator.get_clock_freq()*1e-6
 
-        for i in np.arange(self._M + self._pulsenumber_averaging + 1):
-            if i == self._M + self._pulsenumber_averaging:
+        # self._arbitrary_waveform_generator.delete_segments()
+        # self._arbitrary_waveform_generator.clear_err()
+        # self._arbitrary_waveform_generator.reset()
+        # self._arbitrary_waveform_generator.delete_segments()
+        # self._arbitrary_waveform_generator.clear_err()
+        # self._arbitrary_waveform_generator.reset()
+        # The reset button is necessary?!!!!!!!!!!!!!!!!!!!
+
+        # self._arbitrary_waveform_generator.clear_err()
+        # self._arbitrary_waveform_generator.set_trace_mode('SING')
+        self._arbitrary_waveform_generator.delete_segments()
+        self._arbitrary_waveform_generator.reset()
+        self._arbitrary_waveform_generator.clear_err()
+        self._arbitrary_waveform_generator.set_trace_mode('SING')
+        self._arbitrary_waveform_generator.delete_segments()
+
+        self._arbitrary_waveform_generator.init_channel(readout_channel)
+        self._awg_dict_coupling[readout_channel]('DC')
+        self._awg_dict_amplitude[readout_channel](2)
+
+        self._arbitrary_waveform_generator.set_ref_source('EXT')
+        self._arbitrary_waveform_generator.set_ref_freq(10)
+        self._arbitrary_waveform_generator.set_clock_freq(1e3)
+        self._arbitrary_waveform_generator.set_channels_synchronised('ON')
+
+        for i in CHANNEL:
+            self._awg_waves[i] = []
+
+        self._seq_list = []
+
+        for i in np.arange(self._M + self.get_pulsenumber_averaging() + 1):
+            print i
+            if i == self._M + self.get_pulsenumber_averaging():
                 # changing smb frequency part of the sequence
+
                 p = [0, 0, 0, 0]
                 wave_pulse_read_out  = self.volt2bit_2(self.cos(p, time_smb))
                 wave_pulse_read_out = self._arbitrary_waveform_generator.\
-                        add_markers_mask(self._awg_routing['mw_marker'],
-                        self.get_marker2_start(), self.get_marker2_width(),
+                    add_markers_mask(self._awg_routing['mw_marker'],
+                    np.int(self.get_marker2_start()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                    np.int(self.get_marker2_width()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
                         wave_pulse_read_out)
 
                 self._seq_list.append([1,i+1,0])
@@ -697,7 +775,7 @@ class virtual_pulsing_instrument(Instrument):
                 self._arbitrary_waveform_generator.send_waveform(wave_pulse_read_out, readout_channel, i+1)
             elif i < self._M:
                 # waiting part of the sequence
-                p = [0, 0, 0, 0]
+
                 wave_pulse_read_out  = self.volt2bit_2(np.zeros(16*50)) #
 
                 self._seq_list.append([1,i+1,0])
@@ -706,31 +784,187 @@ class virtual_pulsing_instrument(Instrument):
                 self._arbitrary_waveform_generator.send_waveform(wave_pulse_read_out, readout_channel, i+1)
             else:
                 # reading-out part of the sequence
-                p = [self.get_temp_start_firsttone(), self.get_temp_length_firsttone(), amplitude, self.get_down_converted_frequency()]
+                p = [self.get_temp_start_firsttone(), self.get_temp_length_firsttone(),
+                    amplitude, self.get_down_converted_frequency()*1e9]
 
-                wave_pulse_read_out  = self.volt2bit_2(self.cos(p, time))
+                wave_pulse_read_out  = self.volt2bit_2(self.cos(p, time) )
                 wave_pulse_read_out = self._arbitrary_waveform_generator.add_markers_mask(\
-                                self.get_board_marker(), self.get_marker1_start(),
-                                self.get_marker1_width(), wave_pulse_read_out)
+                    self._awg_routing['board_marker'],
+                    np.int(self.get_marker1_start()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                    np.int(self.get_marker1_width()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                    wave_pulse_read_out)
 
                 self._seq_list.append([1,i+1,0])
                 self._awg_waves[readout_channel].append(wave_pulse_read_out)
                 self._arbitrary_waveform_generator.send_waveform(wave_pulse_read_out, readout_channel, i+1)
 
         self._seq_list = np.array(self._seq_list)
+
+
+        self._arbitrary_waveform_generator.channel_select(readout_channel)
+        self._arbitrary_waveform_generator.send_seq(self._seq_list, sequence_index)
+
+        self._arbitrary_waveform_generator.set_trigger_source('EVEN')
+
+        self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
+        self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
+        self._arbitrary_waveform_generator.set_m2_marker_high_1_2(1.)
+        self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
+
+        self._microwave_generator1.set_gui_update('OFF')
+
+        self._arbitrary_waveform_generator.seq_jump_source('BUS')
+        self._arbitrary_waveform_generator.seq_mode('STEP')
+        self._arbitrary_waveform_generator.set_trigger_mode('NORM')
+        self._arbitrary_waveform_generator.set_trigger_timer_mode('TIME')
+        self._arbitrary_waveform_generator.set_run_mode('TRIG')
+        self._arbitrary_waveform_generator.set_func_mode('SEQ')
+        self._arbitrary_waveform_generator.set_trigger_timer_time(self._trigger_time) #in us
+
+        self._awg_dict_output[readout_channel]('ON') # switching on the output of the readout channel
+        # self._arbitrary_waveform_generator.set_output('ON', channel=readout_channel)
+        self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
+        self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
+
+    def write_twotone_pulsessequence(self, cwf, freq_vec, power_tone1, power_tone2, average,
+                SSBrange='0550', readout_channel=1, excitation_channel=4,sequence_index=1):
+        '''
+        Putting in the awg memory the twotone pulses sequence and reading the others instruments.
+        Inputs:
+            cwf [GHz]: continuous wave frequency of the first tone
+            frec_vec: frequency vector in GHz of the onetone sweep
+            power_tone1: power at the SSB output in dBm for first tone
+            power_tone2: power at the SSB output in dBm for second tone
+            average (int): number of total averaging
+            readout_channel: awg channel used. Value in (1, 2, 3, 4)
+            excitation_channel: awg channel used. Value in (1, 2, 3, 4)
+            sequence_index: value in 1 to 1000
+        '''
+        self._arbitrary_waveform_generator.reset()
+        self._arbitrary_waveform_generator.clear_err()
+        self._arbitrary_waveform_generator.set_trace_mode('SING')
+        self._arbitrary_waveform_generator.delete_segments()
+
+        self._arbitrary_waveform_generator.init_channel(readout_channel)
+        self._arbitrary_waveform_generator.delete_segments()
+        self._arbitrary_waveform_generator.init_channel(excitation_channel)
+        self._arbitrary_waveform_generator.delete_segments()
+
+        self._awg_dict_coupling[readout_channel]('DC')
+        self._awg_dict_amplitude[readout_channel](2)
+        self._awg_dict_coupling[excitation_channel]('DC')
+        self._awg_dict_amplitude[excitation_channel](2)
+
+        self._microwave_generator1.set_gui_update('OFF')
+        self._microwave_generator2.set_gui_update('OFF')
+
+        self._microwave_generator1.set_freqsweep('off')
+        self.set_src1_cw_frequency(cwf)
+
+        self._microwave_generator2.set_freqsweep('on')
+        self._microwave_generator2.set_sweepmode('STEP')
+        self._microwave_generator2.set_spacingfreq('lin')
+
+        self.set_src1_frequency_start(freq_vec[0])
+        self.set_src1_frequency_stop(freq_vec[-1])
+        self.set_src1_points_freq_sweep(len(freq_vec))
+
+        if SSBrange == '0550':
+            self._microwave_generator2.set_power(5.)
+        elif SSBrange == '4080' or SSBrange == '8012':
+            self._microwave_generator2.set_power(15.)
+        else:
+            print 'Error: SSBrange should be 0550, 4080 or 8012'
+
+        self._freq_vec = freq_vec
+        self.set_total_averaging(average)
+
+        power_tone1 += self.get_SSB_conversion_loss()
+        power_tone2 += self.get_SSB_conversion_loss()
+        amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
+        amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
+        print amplitude_tone1, amplitude_tone2
+
+        self.set_temp_length_secondtone(20e-6)
+        self.set_temp_start_firsttone(self.get_temp_start_secondtone()+self.get_temp_length_secondtone())
+        self.set_marker1_start(self.get_temp_start_firsttone())
+
+        ########################################################################
+        nb_samples_smb =  round(1.2*(self.get_marker2_start()+self.get_marker2_width())*\
+                self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
+        time_smb = np.arange(nb_samples_smb)/self._arbitrary_waveform_generator.get_clock_freq()*1e-6
+
+        nb_samples =  round((self.get_marker1_start()+self.get_marker1_width()+\
+                self.get_temp_start_firsttone()+self.get_temp_length_firsttone()+\
+                        self.get_temp_start_secondtone()+self.get_temp_length_secondtone() )*\
+                self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
+        time = np.arange(nb_samples)/self._arbitrary_waveform_generator.get_clock_freq()*1e-6
+
+
+        self._awg_waves[readout_channel] = []
+        self._awg_waves[excitation_channel] = []
+        self._seq_list = []
+        for i in np.arange(self._M + self.get_pulsenumber_averaging() + 1):
+            if i == self._M + self.get_pulsenumber_averaging():
+                p = [0, 0, 0., 0]
+                wave_pulse_read_out  = self.volt2bit_2(self.cos(p, time_smb))
+                wave_pulse_read_out = self._arbitrary_waveform_generator.\
+                    add_markers_mask(self._awg_routing['mw_marker'],
+                    np.int(self.get_marker2_start()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                    np.int(self.get_marker2_width()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                        wave_pulse_read_out)
+                ancilla_excitation = self.volt2bit_2(self.cos(p, time_smb))
+                self._awg_waves[readout_channel].append(wave_pulse_read_out)
+                self._awg_waves[excitation_channel].append(ancilla_excitation)
+                self._arbitrary_waveform_generator.send_waveform(wave_pulse_read_out, readout_channel, i+1)
+                self._arbitrary_waveform_generator.send_waveform(ancilla_excitation, excitation_channel, i+1)
+                self._seq_list.append([1,i+1,0])
+            elif i < self._M:
+                wave_pulse_read_out  = self.volt2bit_2(np.zeros(16*50)) # it seems that the array of zeros should be large enough
+                ancilla_excitation = self.volt2bit_2(np.zeros(16*50))
+                self._awg_waves[readout_channel].append(wave_pulse_read_out)
+                self._awg_waves[excitation_channel].append(ancilla_excitation)
+                self._arbitrary_waveform_generator.send_waveform(wave_pulse_read_out, readout_channel, i+1)
+                self._arbitrary_waveform_generator.send_waveform(ancilla_excitation, excitation_channel, i+1)
+                self._seq_list.append([1,i+1,0])
+            else:
+                p_qb=[self.get_temp_start_secondtone(), self.get_temp_length_secondtone(),
+                    amplitude_tone2, self.get_down_converted_frequency()*1e9]
+                ancilla_excitation = self.volt2bit_2(self.cos(p_qb, time))
+                self._arbitrary_waveform_generator.send_waveform(ancilla_excitation, excitation_channel, i+1)
+
+                p = [self.get_temp_start_firsttone(), self.get_temp_length_firsttone(),
+                    amplitude_tone1, self.get_down_converted_frequency()*1e9]
+                wave_pulse_read_out  = self.volt2bit_2(self.cos(p, time))
+                wave_pulse_read_out = self._arbitrary_waveform_generator.add_markers_mask(\
+                    self._awg_routing['board_marker'],
+                    np.int(self.get_marker1_start()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                    np.int(self.get_marker1_width()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                    wave_pulse_read_out)
+                self._arbitrary_waveform_generator.send_waveform(wave_pulse_read_out, readout_channel, i+1)
+
+                self._awg_waves[readout_channel].append(wave_pulse_read_out)
+                self._awg_waves[excitation_channel].append(ancilla_excitation)
+
+                self._seq_list.append([1,i+1,0])
+
+
+        self._seq_list = np.array(self._seq_list)
+
+        self._arbitrary_waveform_generator.channel_select(readout_channel)
+        self._arbitrary_waveform_generator.send_seq(self._seq_list, sequence_index)
+        self._arbitrary_waveform_generator.channel_select(excitation_channel)
+        self._arbitrary_waveform_generator.send_seq(self._seq_list, sequence_index)
+
         self._arbitrary_waveform_generator.set_ref_source('EXT')
         self._arbitrary_waveform_generator.set_ref_freq(10)
         self._arbitrary_waveform_generator.set_clock_freq(1e3)
         self._arbitrary_waveform_generator.set_channels_synchronised('ON')
-        self._arbitrary_waveform_generator.channel_select(readout_channel)
-        self._arbitrary_waveform_generator.send_seq(seq_list, sequence_index)
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-        # self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
-        # self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
         self._arbitrary_waveform_generator.set_m2_marker_high_1_2(1.)
         self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
-        # smb_cavity.set_gui_update('OFF')
+
         self._arbitrary_waveform_generator.seq_jump_source('BUS')
         self._arbitrary_waveform_generator.seq_mode('STEP')
         self._arbitrary_waveform_generator.set_trigger_mode('NORM')
@@ -739,9 +973,13 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_func_mode('SEQ')
         self._arbitrary_waveform_generator.set_trigger_timer_time(self._trigger_time) #in us
         self._awg_dict_output[readout_channel]('ON') # switching on the output of the readout channel
-        # self._arbitrary_waveform_generator.set_output('ON', channel=readout_channel)
+        self._awg_dict_output[excitation_channel]('ON')
+
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
+
+
+        ########################################################################
 
     # def measure_onetone(self, p0=[0,0,0,0], fitting=True):
     #     '''
@@ -845,11 +1083,23 @@ class virtual_pulsing_instrument(Instrument):
     #     plot2d_2.save_png()
     #     plot2d_3.save_png()
     #     qt.mend()
-
+    def display_pulse_sequence(self):
+        # fig, (ax1, ax2,ax3,ax4) = plt.subplots(4,1)
+        #
+        # ax1.plot( [item for sublist in self._awg_waves[1] for item in sublist])
+        # ax2.plot([item for sublist in self._awg_waves[2] for item in sublist])
+        # ax3.plot([item for sublist in self._awg_waves[3] for item in sublist])
+        # ax4.plot([item for sublist in self._awg_waves[4] for item in sublist])
+        fig, ax = plt.subplots(1,1)
+        for i in CHANNEL:
+            ax.plot( [item for sublist in self._awg_waves[1] for item in sublist], label='ch_'+str(i))
+        ax.grid()
+        ax.legend(loc='best')
+        plt.show()
     ############################################################################
     # useful Functions
     ############################################################################
-    def volt2bit(volt):
+    def volt2bit(self, volt):
         """
             Return the bit code corresponding to the entered voltage value in uint16
         """
@@ -859,7 +1109,7 @@ class virtual_pulsing_instrument(Instrument):
         return  np.array(np.round((volt + full/2.)*resolution/full, 0),
                          dtype ='uint16')
 
-    def volt2bit_2(volt):
+    def volt2bit_2(self, volt):
         """
             Return the bit code corresponding to the entered voltage value in uint16
         """
@@ -869,7 +1119,7 @@ class virtual_pulsing_instrument(Instrument):
         return  np.array(np.round((volt + full/2.)*resolution/full, 0),
                          dtype ='uint16')
 
-    def pulse(p, x, type='DC'):
+    def pulse(self, p, x, type='DC'):
         start, width, amplitude = p
 
         # from second to sample
@@ -885,7 +1135,7 @@ class virtual_pulsing_instrument(Instrument):
 
         return amplitude*pulse
 
-    def cos(p, x):
+    def cos(self, p, x):
         start, duration, amplitude, frequency = p
 
         # from second to sample
