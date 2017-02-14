@@ -632,8 +632,6 @@ class AmplitudePhasePerSequencedB(DataTreatment):
         calculation.
         Return the amplitude in dB and the phase in rad
     """
-
-
     def __init__(self, acquisition_time, samplerate, frequency, input_power,
                  impedance = 50.):
         """
@@ -672,7 +670,6 @@ class AmplitudePhasePerSequencedB(DataTreatment):
         self.set_input_power(input_power)
 
 
-
     def set_input_power(self, input_power):
         """
             Set the input power.
@@ -683,10 +680,6 @@ class AmplitudePhasePerSequencedB(DataTreatment):
         # We save the input power in V
         self.input_amplitude = np.sqrt(1e-3*10**(input_power/10.)\
                                        *self.impedance)
-
-
-
-
 
 
     def process(self, data, queue_treatment, parameters):
@@ -779,23 +772,6 @@ class RealImagPerSequence(DataTreatment):
             real_mean = self.mean_averaging(self.real_mean, real)
             imag_mean = self.mean_averaging(self.imag_mean, imag)
 
-            # If we can calculate the standard deviation
-            # if self.treated_buffer < 2:
-            #
-            #     self.real_std = real_mean
-            #     self.imag_std = imag_mean
-            # else:
-            #
-            #     self.real_std = np.sqrt((self.treated_buffer - 1.)*self.real_std**2.\
-            #                              /self.treated_buffer
-            #                              + (real - self.real_mean)**2.\
-            #                             /(self.treated_buffer + 1.))
-            #
-            #     self.imag_std = np.sqrt((self.treated_buffer - 1.)*self.imag_std**2.\
-            #                              /self.treated_buffer
-            #                              + (imag - self.imag_mean)**2.\
-            #                             /(self.treated_buffer + 1.))
-            #
 
             self.real_mean = real_mean
             self.imag_mean = imag_mean
@@ -803,13 +779,12 @@ class RealImagPerSequence(DataTreatment):
             #queue_treatment.put((self.real_mean, self.real_std, self.imag_mean, self.imag_std))
             queue_treatment.put((self.real_mean, self.imag_mean))
 
+
 class RealImag_raw(DataTreatment):
     """
         Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
         using the cos, sin method.
     """
-
-
 
     def __init__(self, acquisition_time, samplerate, frequency):
         """
@@ -840,6 +815,7 @@ class RealImag_raw(DataTreatment):
 
 
 
+
     def process(self, data, queue_treatment, parameters):
         """
             Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
@@ -849,15 +825,12 @@ class RealImag_raw(DataTreatment):
 
         # Data in volt
         data = self.data_in_volt(data)
-
         # Build cos and sin
         real = 2.*np.mean(data[:,:self.nb_points]*self.cos, axis=1)
         imag = 2.*np.mean(data[:,:self.nb_points]*self.sin, axis=1)
 
         # We obtain the current averaging for both and save them for
         # the next iteration
-        # self.real_raw.append(real)
-        # self.imag_raw.append(imag)
 
         self.real_raw = np.concatenate((self.real_raw, real))
         self.imag_raw = np.concatenate((self.imag_raw, imag))

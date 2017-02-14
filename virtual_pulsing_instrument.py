@@ -6,6 +6,7 @@ import instruments
 import numpy as np
 import types
 import logging
+import ATS9360.DataTreatment as dt
 
 # now coded in this driver
 import matplotlib.pyplot as plt
@@ -291,6 +292,7 @@ class virtual_pulsing_instrument(Instrument):
 
 
         # initialize the board
+        self._board.set_mode('CHANNEL_A')
         self._board_samplerate = 400.
         self._board.set_samplerate(self._board_samplerate)
         self._board.set_trigger_range(1)
@@ -305,7 +307,7 @@ class virtual_pulsing_instrument(Instrument):
         # initialize awg
         self._arbitrary_waveform_generator.set_ref_freq(10)
         self._arbitrary_waveform_generator.set_clock_freq(1e3)
-        self._trigger_time = 100 # set_trigger_timer_time is in us
+        self._trigger_time = 100. # set_trigger_timer_time is in us
         self._arbitrary_waveform_generator.set_trigger_timer_time(self._trigger_time)
         self._arbitrary_waveform_generator.set_ref_source('EXT')
         self._arbitrary_waveform_generator.init_channel(self._awg_routing['firsttone_channel'])
@@ -389,6 +391,7 @@ class virtual_pulsing_instrument(Instrument):
 
         self.add_function('prep_IQ')
         self.add_function('write_IQ')
+        self.add_function('prep_timing')
 
 
         self.add_function('cos')
@@ -396,12 +399,12 @@ class virtual_pulsing_instrument(Instrument):
         self.add_function('volt2bit_2')
         self.add_function('pulse')
 
-        self.write_onetone_pulsessequence( 0, delete = True)
-        # self.write_twotone_pulsessequence( 0, 0)
-        # self.write_Rabi_pulsessequence( 0, 0, 20e-6, 0.1e-6, 0)
-        # self.write_Relaxation_pulsessequence( 0, 0, 1e-6, 20e-6, 0.1e-6, 0)
-        self.write_Ramsey_pulsessequence( 0, 0, 200e-9, 20e-6, 5e-6, 0)
-        self.write_IQ( 0, 4e-6)
+        self.write_onetone_pulsessequence( delete = True)
+        # # self.write_twotone_pulsessequence( 0, 0)
+        # # self.write_Rabi_pulsessequence( 0, 0, 20e-6, 0.1e-6, 0)
+        # # self.write_Relaxation_pulsessequence( 0, 0, 1e-6, 20e-6, 0.1e-6, 0)
+        # self.write_Ramsey_pulsessequence( 0, 0, 200e-9, 20e-6, 5e-6, 0)
+        # self.write_IQ( 0, 4e-6)
 
     ############################################################################
     # GET_SET
@@ -808,6 +811,12 @@ class virtual_pulsing_instrument(Instrument):
         '''
         Get the down_converted_frequency in GHz
         '''
+        if np.int(self._arbitrary_waveform_generator.get_trigger_timer_time()\
+            *self._SSB_tone1.get_IF_frequency()*1e3) != self._arbitrary_waveform_generator.\
+            get_trigger_timer_time()*self._SSB_tone1.get_IF_frequency()*1e3:
+            print 'Problem: the awg period should be a multiple of the IF period'
+            print 'awg period [us]:', self._arbitrary_waveform_generator.get_trigger_timer_time()
+            print 'IF period [us]:', 1e-3/self._SSB_tone1.get_IF_frequency()
         return self._SSB_tone1.get_IF_frequency()
 
     def do_set_down_converted_frequency(self, dcf):
@@ -871,13 +880,14 @@ class virtual_pulsing_instrument(Instrument):
     ############################################################################
     #  Functions
     ############################################################################
-    def prep_onetone(self, freq_vec, average):
+    def prep_onetone(self, freq_vec, average, power):
         '''
         Preparing the instruments for a onetone pulses sequence. This function do not
         write in the awg memory.
         Inputs:
             frec_vec: frequency vector in GHz of the onetone sweep
             average (int): number of averaging
+            power: power at the awg output
         '''
         # Setting the mw1 on the sweeping mode
         self._microwave_generator1.set_freqsweep('on')
@@ -906,12 +916,20 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-    def write_onetone_pulsessequence(self,  power, delete = False):
+        self.set_power_first_tone(power)
+        amplitude = 10**((power)/10.)
+        print amplitude
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude)
+
+        processus = dt.RealImagPerSequence(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_onetone_pulsessequence(self, delete = False):
         '''
         Putting in the awg memory the onetone pulses sequence and preparing the awg.
         Inputs:
             frec_vec: frequency vector in GHz of the onetone sweep
-            power: power at the SSB output in dBm
             average (int): number of averaging
             readout_channel: awg channel used. Value in (1, 2, 3, 4)
             sequence_index (str): onetone, twone, rabi... yet to be implemented
@@ -921,10 +939,7 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_clock_freq(1e3)
 
         # Computing the amplitude of the readout_pulse
-        self.set_power_first_tone(power)
-        power += self._SSB_tone1.get_conversion_loss()
-        amplitude = np.sqrt(2.*50.*10**((power-30.)/10.))
-        print amplitude
+        amplitude = 0.9999 # corresponds to 16382 in uint16 with volt2bit_2
 
         # Setting the starts of first tone and markers
         self.set_marker1_start(100e-9)
@@ -1062,7 +1077,7 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
 
-    def prep_twotone(self, cwf, freq_vec, average):
+    def prep_twotone(self, cwf, freq_vec, average, power_tone1, power_tone2):
         '''
         Preparing the instruments for a twotone pulses sequence. This function do not
         write in the awg memory.
@@ -1100,16 +1115,23 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-    def write_twotone_pulsessequence(self, power_tone1, power_tone2,
-         delete = False):
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        self.set_power_second_tone(power_tone2)
+        amplitude2 = 10**((power_tone2)/10.)
+        print amplitude1, amplitude2
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
+        processus = dt.RealImagPerSequence(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_twotone_pulsessequence(self, delete = False):
         '''
         Putting in the awg memory the twotone pulses sequence and preparing the others instruments.
         Inputs:
-            cwf [GHz]: continuous wave frequency of the first tone
-            frec_vec: frequency vector in GHz of the second tone sweep
-            power_tone1: power at the SSB output in dBm for first tone
-            power_tone2: power at the SSB output in dBm for second tone
-            average (int): number of total averaging
+            delete: True or False
 
         '''
 
@@ -1133,13 +1155,15 @@ class virtual_pulsing_instrument(Instrument):
         self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2)
         self._arbitrary_waveform_generator.set_marker_source('USER')
 
-        self.set_power_first_tone(power_tone1)
-        power_tone1 += self._SSB_tone1.get_conversion_loss()
-        self.set_power_second_tone(power_tone2)
-        power_tone2 += self._SSB_tone2.get_conversion_loss()
-        amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
-        amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
-        print amplitude_tone1, amplitude_tone2
+        # self.set_power_first_tone(power_tone1)
+        # power_tone1 += self._SSB_tone1.get_conversion_loss()
+        # self.set_power_second_tone(power_tone2)
+        # power_tone2 += self._SSB_tone2.get_conversion_loss()
+        # amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
+        # amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
+        # print amplitude_tone1, amplitude_tone2
+        amplitude1 = 0.9999
+        amplitude2 = 0.9999
 
         self.set_temp_length_secondtone(20e-6)
         self.set_temp_start_secondtone(100e-9)
@@ -1267,7 +1291,7 @@ class virtual_pulsing_instrument(Instrument):
 
         ########################################################################
 
-    def prep_rabi(self, cwf1, cwf2, average, nb_sequences):
+    def prep_rabi(self, cwf1, cwf2, average, nb_sequences, power_tone1, power_tone2):
         '''
         Preparing the instruments for a Rabi pulses sequence. This function do not
         write in the awg memory.
@@ -1298,16 +1322,23 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-    def write_Rabi_pulsessequence(self, power_tone1, power_tone2,
-                             Tr_stop, Tr_step, Tr_start=0., delete=False):
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        self.set_power_second_tone(power_tone2)
+        amplitude2 = 10**((power_tone2)/10.)
+        print amplitude1, amplitude2
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
+        processus = dt.RealImagPerSequence(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_Rabi_pulsessequence(self, Tr_stop, Tr_step, Tr_start=0., delete=False):
         '''
         Putting in the awg memory the Rabi pulses sequence and preparing the others instruments.
         Inputs:
-            cwf1 [GHz]: continuous wave frequency of the first tone
-            cwf2 [GHz]: continuous wave frequency of the second tone
-            power_tone1: power at the SSB output in dBm for first tone
-            power_tone2: power at the SSB output in dBm for second tone
-            average (int): number of total averaging
+
         '''
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
@@ -1329,13 +1360,15 @@ class virtual_pulsing_instrument(Instrument):
         self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2)
         self._arbitrary_waveform_generator.set_marker_source('USER')
 
-        self.set_power_first_tone(power_tone1)
-        power_tone1 += self._SSB_tone1.get_conversion_loss()
-        self.set_power_second_tone(power_tone2)
-        power_tone2 += self._SSB_tone2.get_conversion_loss()
-        amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
-        amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
-        print amplitude_tone1, amplitude_tone2
+        # self.set_power_first_tone(power_tone1)
+        # power_tone1 += self._SSB_tone1.get_conversion_loss()
+        # self.set_power_second_tone(power_tone2)
+        # power_tone2 += self._SSB_tone2.get_conversion_loss()
+        # amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
+        # amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
+        # print amplitude_tone1, amplitude_tone2
+        amplitude_tone1 = 0.9999
+        amplitude_tone2 = 0.9999
 
         self.set_temp_start_secondtone(Tr_stop + Tr_step  - Tr_start)
         self.set_temp_length_secondtone(Tr_start )
@@ -1441,7 +1474,7 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
 
-    def prep_relaxation(self, cwf1, cwf2, average, nb_sequences):
+    def prep_relaxation(self, cwf1, cwf2, average, nb_sequences, power_tone1, power_tone2):
         '''
         Preparing the instruments for a Relaxation pulses sequence. This function do not
         write in the awg memory.
@@ -1472,13 +1505,22 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-    def write_Relaxation_pulsessequence(self, power_tone1, power_tone2,
-                     t_pi, t_wait_stop, t_wait_step, t_wait_start, delete=False):
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        self.set_power_second_tone(power_tone2)
+        amplitude2 = 10**((power_tone2)/10.)
+        print amplitude1, amplitude2
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
+        processus = dt.RealImagPerSequence(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_Relaxation_pulsessequence(self, t_pi, t_wait_stop, t_wait_step, t_wait_start, delete=False):
         '''
         Putting in the awg memory the Relaxation pulses sequence and preparing the others instruments.
         Inputs:
-            power_tone1: power at the SSB output in dBm for first tone
-            power_tone2: power at the SSB output in dBm for second tone
             t_pi [s]:
             t_wait_stop [s]:
             t_wait_step [s]:
@@ -1504,13 +1546,15 @@ class virtual_pulsing_instrument(Instrument):
         self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2)
         self._arbitrary_waveform_generator.set_marker_source('USER')
 
-        self.set_power_first_tone(power_tone1)
-        power_tone1 += self._SSB_tone1.get_conversion_loss()
-        self.set_power_second_tone(power_tone2)
-        power_tone2 += self._SSB_tone2.get_conversion_loss()
-        amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
-        amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
-        print amplitude_tone1, amplitude_tone2
+        # self.set_power_first_tone(power_tone1)
+        # power_tone1 += self._SSB_tone1.get_conversion_loss()
+        # self.set_power_second_tone(power_tone2)
+        # power_tone2 += self._SSB_tone2.get_conversion_loss()
+        # amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
+        # amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
+        # print amplitude_tone1, amplitude_tone2
+        amplitude_tone1 = 0.9999
+        amplitude_tone2 = 0.9999
 
         self.set_temp_start_secondtone(t_wait_stop + t_wait_step - t_wait_start+t_pi)
         self.set_temp_length_secondtone(t_pi)
@@ -1612,7 +1656,7 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
 
-    def prep_ramsey(self, cwf1, cwf2, average, nb_sequences):
+    def prep_ramsey(self, cwf1, cwf2, average, nb_sequences, power_tone1, power_tone2):
         '''
         Preparing the instruments for a Ramsey pulses sequence. This function do not
         write in the awg memory.
@@ -1643,13 +1687,22 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-    def write_Ramsey_pulsessequence(self, power_tone1, power_tone2,
-                        t_pi_o2, t_wait_stop, t_wait_step, t_wait_start, delete=False):
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        self.set_power_second_tone(power_tone2)
+        amplitude2 = 10**((power_tone2)/10.)
+        print amplitude1, amplitude2
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
+        processus = dt.RealImagPerSequence(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_Ramsey_pulsessequence(self, t_pi_o2, t_wait_stop, t_wait_step, t_wait_start, delete=False):
         '''
         Putting in the awg memory the Ramsey pulses sequence and preparing the others instruments.
         Inputs:
-            power_tone1: power at the SSB output in dBm for first tone
-            power_tone2: power at the SSB output in dBm for second tone
             t_pi_o2 [s]:
             t_wait_stop [s]:
             t_wait_step [s]:
@@ -1675,13 +1728,15 @@ class virtual_pulsing_instrument(Instrument):
         self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2)
         self._arbitrary_waveform_generator.set_marker_source('USER')
 
-        self.set_power_first_tone(power_tone1)
-        power_tone1 += self._SSB_tone1.get_conversion_loss()
-        self.set_power_second_tone(power_tone2)
-        power_tone2 += self._SSB_tone2.get_conversion_loss()
-        amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
-        amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
-        print amplitude_tone1, amplitude_tone2
+        # self.set_power_first_tone(power_tone1)
+        # power_tone1 += self._SSB_tone1.get_conversion_loss()
+        # self.set_power_second_tone(power_tone2)
+        # power_tone2 += self._SSB_tone2.get_conversion_loss()
+        # amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
+        # amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
+        # print amplitude_tone1, amplitude_tone2
+        amplitude_tone1 = 0.9999
+        amplitude_tone2 = 0.9999
 
         self.set_temp_start_secondtone(t_wait_stop + t_wait_step - t_wait_start)
         self.set_temp_length_secondtone(t_pi_o2)
@@ -1781,7 +1836,7 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
 
-    def prep_IQ(self, cwf1, counts, cwf2='None'):
+    def prep_IQ(self, cwf1, counts, power_tone1, cwf2='None', power_tone2 = 'None'):
         '''
         Preparing the instruments for a IQ pulses sequence. The IQ pulses sequence
         can be onetone or twotone.
@@ -1796,9 +1851,10 @@ class virtual_pulsing_instrument(Instrument):
         self._microwave_generator1.set_gui_update('OFF')
         self._microwave_generator1.set_freqsweep('off')
         self.set_src1_cw_frequency(cwf1)
+        self._board.set_nb_sequence(100)
         self._board.set_averaging(counts)
         print self._board.get_averaging()
-        self._board.set_nb_sequence(1)
+
 
         self._arbitrary_waveform_generator.channel_select(self._awg_routing['firsttone_channel'])
         self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['IQ'])
@@ -1818,7 +1874,19 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
-    def write_IQ(self, power_tone1, t1, power_tone2=0, t2=0., type='onetone', delete=False):
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        self.set_power_second_tone(power_tone2)
+        amplitude2 = 10**((power_tone2)/10.)
+        print amplitude1, amplitude2
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
+        processus = dt.RealImag_raw(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_IQ(self, t1, t2=0., type='onetone', delete=False):
         '''
         Putting in the awg memory the IQ pulses sequence. The IQ pulses sequence
         can be onetone or twotone.
@@ -1850,13 +1918,15 @@ class virtual_pulsing_instrument(Instrument):
 
         self._arbitrary_waveform_generator.set_clock_freq(1e3)
 
-        self.set_power_first_tone(power_tone1)
-        power_tone1 += self._SSB_tone1.get_conversion_loss()
-        self.set_power_second_tone(power_tone2)
-        power_tone2 += self._SSB_tone2.get_conversion_loss()
-        amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
-        amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
-        print amplitude_tone1, amplitude_tone2
+        # self.set_power_first_tone(power_tone1)
+        # power_tone1 += self._SSB_tone1.get_conversion_loss()
+        # self.set_power_second_tone(power_tone2)
+        # power_tone2 += self._SSB_tone2.get_conversion_loss()
+        # amplitude_tone1 = np.sqrt(2.*50.*10**((power_tone1-30.)/10.))
+        # amplitude_tone2 = np.sqrt(2.*50.*10**((power_tone2-30.)/10.))
+        # print amplitude_tone1, amplitude_tone2
+        amplitude_tone1 = 0.9999
+        amplitude_tone2 = 0.9999
 
         for ch in CHANNEL:
             self._awg_waves['IQ']['binary'][ch] = []
@@ -1959,6 +2029,40 @@ class virtual_pulsing_instrument(Instrument):
 
         self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
+
+    def prep_timing(self, cwf1, average, power_tone1):
+        '''
+        Preparing the instruments for a timing measurement.
+        This function do not write in the awg memory. You need to use write_IQ with
+        onetone to test.
+        Inputs:
+            cwf1 [GHz]: continuous wave frequency of the first tone
+            average (int): number of averaging of the V(t) curve.
+        '''
+        self._awg_dict_output[self._awg_routing['secondtone_channel']]('OFF')
+
+        self._microwave_generator1.set_gui_update('OFF')
+        self._microwave_generator1.set_freqsweep('off')
+        self.set_src1_cw_frequency(cwf1)
+        self._board.set_nb_sequence(100)
+        self._board.set_averaging(average)
+        print self._board.get_averaging()
+
+
+        self._arbitrary_waveform_generator.channel_select(self._awg_routing['firsttone_channel'])
+        self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['IQ'])
+        self._awg_dict_output[self._awg_routing['firsttone_channel']]('ON')
+
+        self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
+        self._arbitrary_waveform_generator.set_trigger_source('EVEN')
+
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        print amplitude1
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+
+        processus = dt.Average()
+        self._board.measurement_initialization(processor=processus)
 
     ############################################################################
     def display_pulses_sequence(self, sequence = 'onetone', display_type='binary'):
