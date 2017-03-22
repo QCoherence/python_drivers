@@ -16,7 +16,8 @@ CHANNEL=(1,2,3,4)
 class virtual_pulsing_instrument(Instrument):
     '''
     TO DO: complete it!!!
-        - write_Ramsey_pulsessequence
+        - write threetones sequence
+        - change the definition of power to a more coherent one...
 
     This is the driver for the virtual instrument which can create a spectroscopic
     sequence pulses and measure it.
@@ -40,11 +41,12 @@ class virtual_pulsing_instrument(Instrument):
     <name> = qt.instruments.create('name', 'virtual_pulsing_instrument',
     awg='awg_name', mwsrc1='name_microwave_generator', board='board_name', ssb1 = 'ssb1_name',
     mwsrc2= 'name_microwave_generator2--if present--', ssb2 = 'ssb2_name--if present--',
+    mwsrc3= 'name_microwave_generator3--if present--',
     current_src='name_current_source--if present--' )
     '''
 
-    def __init__(self, name, awg, mwsrc1, board, ssb1, mwsrc2 = 'None', ssb2= 'None', current_src = 'None',
-            firsttone_channel=1, secondtone_channel=4, board_marker= 1, mw_marker=2):
+    def __init__(self, name, awg, mwsrc1, board, ssb1, mwsrc2 = 'None', ssb2= 'None', mwsrc3 = 'None', ssb3='None',
+            current_src = 'None', firsttone_channel=1, secondtone_channel=4,thirdtone_channel=2, board_marker= 1, mw_marker=2):
         '''
         Initialize the virtual instrument
 
@@ -52,8 +54,12 @@ class virtual_pulsing_instrument(Instrument):
                 - name: Name of the virtual instruments
                 - awg: Name given to an arbitrary waveform generator
                 - mwsrc1: Name given to the first microwave_generator
+                - ssb1: Name given to the first virtual ssb
                 - board: Name given to the acquisition card
                 - mwsrc2: Name given to the second microwave_generator
+                - ssb2: Name given to the second virtual ssb
+                - mwsrc3: Name given to the third microwave_generator
+                - ssb3: Name given to the third virtual ssb
                 - current_src: Name given to the current source
                 - firsttone_channel, secondtone_channel: channel of the awg for
                 first or second tone
@@ -84,12 +90,27 @@ class virtual_pulsing_instrument(Instrument):
         else:
             self._presence_mwsrc2 = 0
 
+        if mwsrc3 != 'None':
+            self._presence_mwsrc3 = 1
+            self._microwave_generator3 = self._instruments.get(mwsrc3)
+            self._microwave_generator3.set_power(5)
+            self._microwave_generator3.set_status('ON')
+        else:
+            self._presence_mwsrc3 = 0
+
         # if we import the second ssb or not
         if ssb2 != 'None':
             self._presence_ssb2 = 1
             self._SSB_tone2 = self._instruments.get(ssb2)
         else:
             self._presence_ssb2 = 0
+
+        # if we import the thrid ssb or not
+        if ssb3 != 'None':
+            self._presence_ssb3 = 1
+            self._SSB_tone3 = self._instruments.get(ssb3)
+        else:
+            self._presence_ssb3 = 0
 
         # if we import the current source or not
         # if current_src != 'None':
@@ -119,8 +140,15 @@ class virtual_pulsing_instrument(Instrument):
                             maxval= 4.,
                             units='dBm',
                             type=types.FloatType)
+        self.add_parameter('power_third_tone',
+                            flags=Instrument.FLAG_GETSET,
+                            minval = -50.,
+                            maxval= 4.,
+                            units='dBm',
+                            type=types.FloatType)
         self.set_power_first_tone(0.)
         self.set_power_second_tone(0.)
+        self.set_power_third_tone(0.)
 
 
         self.add_parameter('cw_frequency',
@@ -129,10 +157,9 @@ class virtual_pulsing_instrument(Instrument):
                             minval = 1e-4,
                             maxval= 40,
                             type=types.FloatType,
-                            channels=(1, 2),
+                            channels=(1, 2, 3),
                             channel_prefix='src%d_')
 
-        # Attention: may have to change something after changing frequency sweep
         # parameters
         self.add_parameter('frequency_start',
                             flags=Instrument.FLAG_GETSET,
@@ -178,19 +205,20 @@ class virtual_pulsing_instrument(Instrument):
                             type=types.DictType)
         self._awg_routing = {}
         # self._awg_routing['firsttone_channel'] = firsttone_channel
-        # self._awg_routing['secondtone_channel'] = secondtone_channel
-        # self._awg_routing['board_marker'] = board_marker
-        # self._awg_routing['mw_marker'] = mw_marker
+            # self._awg_routing['secondtone_channel'] = secondtone_channel
+            # self._awg_routing['board_marker'] = board_marker
+            # self._awg_routing['mw_marker'] = mw_marker
+
         self.set_routing_awg({'firsttone_channel':firsttone_channel,
-            'secondtone_channel':secondtone_channel, 'board_marker':board_marker,
-            'mw_marker':mw_marker})
+                        'secondtone_channel':secondtone_channel,
+                        'thirdtone_channel':thirdtone_channel,
+                        'board_marker':board_marker,
+                        'mw_marker':mw_marker})
 
         self.add_parameter('awg_segmentation',
                             flags=Instrument.FLAG_GETSET,
                             type=types.DictType)
         self._segmentation = {}
-        # self._segmentation['onetone'] = 1 + np.arange(3)
-        # self._segmentation['twotone'] = 4 + np.arange(3)
 
         self.add_parameter('number_segments_memorized',
                             flags=Instrument.FLAG_GET,
@@ -215,6 +243,14 @@ class virtual_pulsing_instrument(Instrument):
                             type=types.FloatType)
         self._secondtone_temp_length = 20e-6
 
+        self.add_parameter('temp_length_thirdtone',
+                            flags=Instrument.FLAG_GETSET,
+                            minval = 0.,
+                            maxval= 100e-6,
+                            units='s',
+                            type=types.FloatType)
+        self.set_temp_length_thirdtone(0)
+
         self.add_parameter('temp_start_firsttone',
                             flags=Instrument.FLAG_GETSET,
                             minval = 0.,
@@ -230,6 +266,14 @@ class virtual_pulsing_instrument(Instrument):
                             units='s',
                             type=types.FloatType)
         self._secondtone_temp_start = 100e-9
+
+        self.add_parameter('temp_start_thirdtone',
+                            flags=Instrument.FLAG_GETSET,
+                            minval = 0.,
+                            maxval= 100e-6,
+                            units='s',
+                            type=types.FloatType)
+        self.set_temp_start_thirdtone(0.)
 
         self.add_parameter('marker1_width',
                             flags=Instrument.FLAG_GETSET,
@@ -263,9 +307,10 @@ class virtual_pulsing_instrument(Instrument):
         # it is the typical  conversion loss of a SSB
 
         self.add_parameter('electrical_phase_delay',
-                            flags=Instrument.FLAG_GET,
+                            flags=Instrument.FLAG_GETSET,
                             type=types.FloatType)
-        self._elec_delay = 29.8
+        self._elec_delay = 31.8
+        # 29.8
 
         self.add_parameter('pulsenumber_averaging',
                             flags=Instrument.FLAG_GET,
@@ -297,7 +342,7 @@ class virtual_pulsing_instrument(Instrument):
         self._board.set_samplerate(self._board_samplerate)
         self._board.set_trigger_range(1)
         self._board.set_trigger_level(0.2)
-        self._board.set_trigger_delay(151.)
+        self._board.set_trigger_delay(200.)
         acq_time = (self._firsttone_temp_length - 0.2e-6)*1e9
         acq_time = np.int(acq_time/128)*128
         # print acq_time
@@ -330,13 +375,13 @@ class virtual_pulsing_instrument(Instrument):
                                    4:self._arbitrary_waveform_generator.set_ch4_output }
 
         self._sequence_dict = {'onetone':1, 'twotone':2, 'rabi1':3, 'rabi2':4,
-            'relaxation1':5,'relaxation2':6, 'ramsey1':7, 'ramsey2':8, 'IQ':9}
-        # print self._arbitrary_waveform_generator.get_ch1_amplitude()
+            'relaxation1':5,'relaxation2':6, 'ramsey1':7, 'ramsey2':8, 'IQ':9, 'threetone':10}
+
+        # we prepare all the channels of the AWG
         for i in CHANNEL:
             self._awg_dict_coupling[i]('DC')
             self._awg_dict_amplitude[i](2)
             self._awg_dict_output[i]('OFF')
-        # print self._arbitrary_waveform_generator.get_ch1_amplitude()
 
         self._awg_waves = {'onetone':{'binary':{1:[], 2:[], 3:[], 4:[] },
                                         'cosine':{1:[], 2:[], 3:[], 4:[] },
@@ -355,7 +400,11 @@ class virtual_pulsing_instrument(Instrument):
                                     'marker_trigger':{1:[], 2:[], 3:[], 4:[] }},
                             'IQ': {'binary':{1:[], 2:[], 3:[], 4:[] },
                                     'cosine':{1:[], 2:[], 3:[], 4:[] },
+                                    'marker_trigger':{1:[], 2:[], 3:[], 4:[] }},
+                            'threetone': {'binary':{1:[], 2:[], 3:[], 4:[] },
+                                    'cosine':{1:[], 2:[], 3:[], 4:[] },
                                     'marker_trigger':{1:[], 2:[], 3:[], 4:[] }} }
+
         #initialize the mw generators
         if self._presence_mwsrc2:
             self._microwave_generator1.set_freqsweep('off')
@@ -370,6 +419,9 @@ class virtual_pulsing_instrument(Instrument):
             self._microwave_generator1.set_spacingfreq('lin')
             self._microwave_generator1.set_gui_update('OFF')
 
+        # if self._presence_mwsrc3:
+            # self._microwave_generator3.set_freqsweep('off')
+            # self._microwave_generator3.set_gui_update('OFF')
 
         self._M = 0 # number of triggers to wait to be sure that frequency has changed
         while (self._M+1)*self._arbitrary_waveform_generator.get_trigger_timer_time()*1e-6 < self.get_mw_security_time():
@@ -389,6 +441,9 @@ class virtual_pulsing_instrument(Instrument):
         self.add_function('prep_ramsey')
         self.add_function('write_Ramsey_pulsessequence')
 
+        self.add_function('write_threetone_pulsessequence')
+        self.add_function('prep_threetone')
+
         self.add_function('prep_IQ')
         self.add_function('write_IQ')
         self.add_function('prep_timing')
@@ -400,11 +455,12 @@ class virtual_pulsing_instrument(Instrument):
         self.add_function('pulse')
 
         self.write_onetone_pulsessequence( delete = True)
-        # # self.write_twotone_pulsessequence( 0, 0)
-        # # self.write_Rabi_pulsessequence( 0, 0, 20e-6, 0.1e-6, 0)
-        # # self.write_Relaxation_pulsessequence( 0, 0, 1e-6, 20e-6, 0.1e-6, 0)
-        # self.write_Ramsey_pulsessequence( 0, 0, 200e-9, 20e-6, 5e-6, 0)
-        # self.write_IQ( 0, 4e-6)
+        self.write_twotone_pulsessequence()
+        # self.write_threetone_pulsessequence(50e-9)
+        # self.write_Rabi_pulsessequence( 0.2e-6, 1e-9, 0)
+        # self.write_Relaxation_pulsessequence( 67e-9, 20e-6, 0.1e-6, 0e-6)
+        # self.write_Ramsey_pulsessequence(  200e-9, 20e-6, 5e-6, 0)
+        # self.write_IQ( 4e-6)
 
     ############################################################################
     # GET_SET
@@ -457,6 +513,20 @@ class virtual_pulsing_instrument(Instrument):
         '''
         self._power_second_tone = IFP
 
+    def do_get_power_third_tone(self):
+        '''
+        Get the power_third_tone. It gets the estimated power of the third tone after the SSB.
+        '''
+        return self._power_third_tone
+
+    def do_set_power_third_tone(self, IFP):
+        '''
+        Set the power_third_tone. It sets the estimated power of the third tone after the SSB.
+        Input:
+            IFP (float): power_third_tone in dBm
+        '''
+        self._power_third_tone = IFP
+
     def do_get_cw_frequency(self, channel=1):
         '''
         Gets the continuous wave frequency in GHz of the microwave generator channel
@@ -465,8 +535,10 @@ class virtual_pulsing_instrument(Instrument):
             return self._microwave_generator1.get_frequency()/1e9 + self._SSB_tone1.get_band_type()*self.get_down_converted_frequency()
         elif channel==2:
             return self._microwave_generator2.get_frequency()/1e9 + self._SSB_tone2.get_band_type()*self.get_down_converted_frequency()
+        elif channel==3:
+            return self._microwave_generator3.get_frequency()/1e9 + self._SSB_tone3.get_band_type()*self.get_down_converted_frequency()
         else:
-            print 'Error: channel must be in (1, 2)'
+            print 'Error: channel must be in (1, 2, 3)'
 
     def do_set_cw_frequency(self, cwf, channel=1):
         '''
@@ -478,14 +550,19 @@ class virtual_pulsing_instrument(Instrument):
             if cwf > self._SSB_tone1.get_freq_stop() or cwf < self._SSB_tone1.get_freq_start():
                 print 'Careful! You are over the range of the SSB'
 
-            return self._microwave_generator1.set_frequency(cwf*1e9)
+            self._microwave_generator1.set_frequency(cwf*1e9)
         elif channel == 2:
             cwf -= self._SSB_tone2.get_band_type()*self.get_down_converted_frequency()
             if cwf > self._SSB_tone2.get_freq_stop() or cwf < self._SSB_tone2.get_freq_start():
                 print 'Careful! You are over the range of the SSB'
-            return self._microwave_generator2.set_frequency(cwf*1e9)
+            self._microwave_generator2.set_frequency(cwf*1e9)
+        elif channel == 3:
+            cwf -= self._SSB_tone3.get_band_type()*self.get_down_converted_frequency()
+            if cwf > self._SSB_tone3.get_freq_stop() or cwf < self._SSB_tone3.get_freq_start():
+                print 'Careful! You are over the range of the SSB'
+            self._microwave_generator3.set_frequency(cwf*1e9)
         else:
-            print 'Error: channel must be in (1, 2)'
+            print 'Error: channel must be in (1, 2, 3)'
 
     def do_get_frequency_start(self, channel=1):
         '''
@@ -719,6 +796,18 @@ class virtual_pulsing_instrument(Instrument):
         '''
         self._secondtone_temp_length = delta_t
 
+    def do_get_temp_length_thirdtone(self):
+        '''
+        Gets the temporal length of the third tone pulses in s.
+        '''
+        return self._thirdtone_temp_length
+
+    def do_set_temp_length_thirdtone(self, delta_t):
+        '''
+        Sets the temporal length of the third tone pulses in s.
+        '''
+        self._thirdtone_temp_length = delta_t
+
     def do_get_temp_start_firsttone(self):
         '''
         Gets the temporal start of the first tone pulses in s.
@@ -742,6 +831,18 @@ class virtual_pulsing_instrument(Instrument):
         Sets the temporal start of the second tone pulses in s.
         '''
         self._secondtone_temp_start = t0
+
+    def do_get_temp_start_thirdtone(self):
+        '''
+        Gets the temporal start of the third tone pulses in s.
+        '''
+        return self._thirdtone_temp_start
+
+    def do_set_temp_start_thirdtone(self, t0):
+        '''
+        Sets the temporal start of the third tone pulses in s.
+        '''
+        self._thirdtone_temp_start = t0
 
     def do_get_marker1_width(self):
         '''
@@ -852,6 +953,14 @@ class virtual_pulsing_instrument(Instrument):
         '''
         return self._elec_delay
 
+    def do_set_electrical_phase_delay(self, e_delay):
+        '''
+        Set the electrical phase delay.
+        Input:
+            The electrical phase delay in s due to the propagation in the wires.
+        '''
+        self._elec_delay = e_delay
+
     def do_get_mw_security_time(self):
         '''
         Get the security time to allow the microwave generator to change frequency.
@@ -895,6 +1004,8 @@ class virtual_pulsing_instrument(Instrument):
         self._microwave_generator1.set_spacingfreq('lin')
         if  self._presence_mwsrc2:
             self._microwave_generator2.set_freqsweep('off')
+
+        self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
         # Setting the sweep parameters to mw1
         self.set_src1_frequency_start(freq_vec[0])
@@ -961,7 +1072,7 @@ class virtual_pulsing_instrument(Instrument):
         if np.min((time_smb[-1], time[-1])) > self._trigger_time*1e-6:
             print 'Timing problem?'
 
-        if delete:
+        if delete == 'all':
             # Emptying the awg memory
             self._arbitrary_waveform_generator.delete_segments()
             self._arbitrary_waveform_generator.reset()
@@ -969,6 +1080,10 @@ class virtual_pulsing_instrument(Instrument):
             self._arbitrary_waveform_generator.set_trace_mode('SING')
             self._arbitrary_waveform_generator.delete_segments()
             self._segmentation = {}
+        elif delete == 'segments':
+            n_seg = self.get_awg_segmentation()['onetone']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
 
         # Initializing awg firsttone channel
         self._arbitrary_waveform_generator.init_channel(self._awg_routing['firsttone_channel'])
@@ -1101,6 +1216,7 @@ class virtual_pulsing_instrument(Instrument):
         self.set_src2_points_freq_sweep(len(freq_vec))
 
         self._microwave_generator2.set_power(self._SSB_tone2.get_LO_power())
+        # print self._microwave_generator2.get_power()
 
         self.set_total_averaging(average)
 
@@ -1135,13 +1251,18 @@ class virtual_pulsing_instrument(Instrument):
 
         '''
 
-        if delete:
-            # Emptying the awg
+        if delete == 'all':
+            # Emptying the awg memory
+            self._arbitrary_waveform_generator.delete_segments()
             self._arbitrary_waveform_generator.reset()
             self._arbitrary_waveform_generator.clear_err()
             self._arbitrary_waveform_generator.set_trace_mode('SING')
             self._arbitrary_waveform_generator.delete_segments()
             self._segmentation = {}
+        elif delete == 'segments':
+            n_seg = self.get_awg_segmentation()['twotone']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
 
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
@@ -1219,14 +1340,14 @@ class virtual_pulsing_instrument(Instrument):
 
         # excitation and readout segments ######################################
         p_qb = [self.get_temp_start_secondtone(), self.get_temp_length_secondtone(),
-            amplitude_tone2, self.get_down_converted_frequency()*1e9]
+            amplitude2, self.get_down_converted_frequency()*1e9]
 
         segment3_ex = self.volt2bit_2(self.cos(p_qb, time))
         self._arbitrary_waveform_generator.send_waveform(segment3_ex,
                             self._awg_routing['secondtone_channel'], self.get_number_segments_memorized() + 3)
 
         p = [self.get_temp_start_firsttone(), self.get_temp_length_firsttone(),
-            amplitude_tone1, self.get_down_converted_frequency()*1e9]
+            amplitude1, self.get_down_converted_frequency()*1e9]
         segment3_ro  = self.volt2bit_2(self.cos(p, time))
         segment3_ro = self._arbitrary_waveform_generator.add_markers_mask(\
             self._awg_routing['board_marker'],
@@ -1291,6 +1412,255 @@ class virtual_pulsing_instrument(Instrument):
 
         ########################################################################
 
+    def prep_threetone(self, cwf_ex, cwf_ro, freq_vec, average, power_tone1, power_tone2, power_tone3):
+        '''
+        Preparing the instruments for a twotone pulses sequence. This function do not
+        write in the awg memory.
+        Inputs:
+            cwf [GHz]: continuous wave frequency of the first tone
+            frec_vec: frequency vector in GHz of the second tone sweep
+            average (int): number of total averaging
+        '''
+        self._microwave_generator1.set_gui_update('OFF')
+        self._microwave_generator2.set_gui_update('OFF')
+        self._microwave_generator3.set_gui_update('OFF')
+
+        self._microwave_generator1.set_freqsweep('off')
+        # self._microwave_generator3.set_freqsweep('off') # hp83630 does not have freqsweep function
+        self.set_src1_cw_frequency(cwf_ro)
+        self.set_src3_cw_frequency(cwf_ro)
+
+        self._microwave_generator2.set_freqsweep('on')
+        self._microwave_generator2.set_sweepmode('STEP')
+        self._microwave_generator2.set_spacingfreq('lin')
+
+        self.set_src2_frequency_start(freq_vec[0])
+        self.set_src2_frequency_stop(freq_vec[-1])
+        self.set_src2_points_freq_sweep(len(freq_vec))
+
+        self._microwave_generator2.set_power(self._SSB_tone2.get_LO_power())
+        self._microwave_generator3.set_power(self._SSB_tone3.get_LO_power())
+        # print self._microwave_generator2.get_power()
+
+        self.set_total_averaging(average)
+
+        self._arbitrary_waveform_generator.channel_select(self._awg_routing['firsttone_channel'])
+        self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['twotone'])
+        self._arbitrary_waveform_generator.channel_select(self._awg_routing['secondtone_channel'])
+        self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['twotone'])
+
+        self._awg_dict_output[self._awg_routing['firsttone_channel']]('ON')
+        self._awg_dict_output[self._awg_routing['secondtone_channel']]('ON')
+        self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
+        self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
+        self._arbitrary_waveform_generator.set_trigger_source('EVEN')
+
+        self.set_power_first_tone(power_tone1)
+        amplitude1 = 10**((power_tone1)/10.)
+        self.set_power_second_tone(power_tone2)
+        amplitude2 = 10**((power_tone2)/10.)
+        self.set_power_second_tone(power_tone3)
+        amplitude3 = 10**((power_tone3)/10.)
+
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+        self._awg_dict_amplitude[self._awg_routing['thirdtone_channel']](2*amplitude3)
+
+        processus = dt.RealImagPerSequence(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
+                          self.get_down_converted_frequency()*1e9)
+        self._board.measurement_initialization(processor=processus)
+
+    def write_threetone_pulsessequence(self, t_pi, delete = False):
+        '''
+        WORK IN PROGRESS
+        Putting in the awg memory the threetone pulses sequence and preparing the others instruments.
+        Inputs:
+            delete: True or False
+            t_pi [ns]: time for the fixed frequency excitation tone -- should be a pi pulse --
+
+        '''
+
+        if delete == 'all':
+            # Emptying the awg memory
+            self._arbitrary_waveform_generator.delete_segments()
+            self._arbitrary_waveform_generator.reset()
+            self._arbitrary_waveform_generator.clear_err()
+            self._arbitrary_waveform_generator.set_trace_mode('SING')
+            self._arbitrary_waveform_generator.delete_segments()
+            self._segmentation = {}
+        elif delete == 'segments':
+            n_seg = self.get_awg_segmentation()['threetone']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
+
+        self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
+        self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
+
+        self._arbitrary_waveform_generator.init_channel(self._awg_routing['thirdtone_channel'])
+        self._awg_dict_coupling[self._awg_routing['thirdtone_channel']]('DC')
+        self._awg_dict_amplitude[self._awg_routing['thirdtone_channel']](2)
+
+        self._arbitrary_waveform_generator.init_channel(self._awg_routing['secondtone_channel'])
+        self._awg_dict_coupling[self._awg_routing['secondtone_channel']]('DC')
+        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2)
+
+        self._arbitrary_waveform_generator.init_channel(self._awg_routing['firsttone_channel'])
+        self._awg_dict_coupling[self._awg_routing['firsttone_channel']]('DC')
+        self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2)
+        self._arbitrary_waveform_generator.set_marker_source('USER')
+
+        amplitude = 0.9999
+
+        self.set_temp_length_thirdtone(t_pi)
+        self.set_temp_start_thirdtone(100e-9)
+        self.set_temp_length_secondtone(20e-6)
+        self.set_temp_start_secondtone(self.get_temp_length_thirdtone() + self.get_temp_start_thirdtone())
+        self.set_temp_start_firsttone(self.get_temp_start_secondtone()+self.get_temp_length_secondtone())
+        self.set_temp_length_firsttone(4e-6)
+        self.set_marker1_start(self.get_temp_start_firsttone())
+        self.set_marker2_start(self.get_temp_start_secondtone())
+
+        ########################################################################
+        nb_samples_smb =  round(1.2*(self.get_marker2_start()+self.get_marker2_width())*\
+                self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
+        time_smb = np.arange(nb_samples_smb)/self._arbitrary_waveform_generator.get_clock_freq()*1e-6
+
+        nb_samples =  round((self.get_marker1_start() + self.get_marker1_width() +\
+                self.get_temp_start_firsttone() + self.get_temp_length_firsttone() +\
+                self.get_temp_start_secondtone() + self.get_temp_length_secondtone()+\
+                self.get_temp_start_thirdtone() + self.get_temp_length_thirdtone() )*\
+                self._arbitrary_waveform_generator.get_clock_freq()*1e6/16., 0)*16
+        time = np.arange(nb_samples)/self._arbitrary_waveform_generator.get_clock_freq()*1e-6
+
+        if np.min((time_smb[-1], time[-1])) > self._trigger_time*1e-6:
+            print 'Timing problem?'
+
+        for i in CHANNEL:
+            self._awg_waves['threetone']['binary'][i] = []
+            self._awg_waves['threetone']['cosine'][i] = []
+            self._awg_waves['threetone']['marker_trigger'][i] = []
+
+        self._seq_list = []
+
+        # Segment triggering the change of smb frequency #######################
+        segment1_ro  = self.volt2bit_2(self.cos([0, 0, 0, 0], time_smb))
+        segment1_ro = self._arbitrary_waveform_generator.add_markers_mask(\
+            self._awg_routing['mw_marker'],
+            np.int(self.get_marker2_start()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+            np.int(self.get_marker2_width()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+                segment1_ro)
+        segment1_ex = self.volt2bit_2(self.cos([0, 0, 0, 0], time_smb))
+
+        # Putting the segment in AWG memory
+        self._arbitrary_waveform_generator.send_waveform(segment1_ro,
+                            self._awg_routing['firsttone_channel'], self.get_number_segments_memorized() + 1)
+        self._arbitrary_waveform_generator.send_waveform(segment1_ro,
+                            self._awg_routing['thirdtone_channel'], self.get_number_segments_memorized() + 1)
+        self._arbitrary_waveform_generator.send_waveform(segment1_ex,
+                            self._awg_routing['secondtone_channel'], self.get_number_segments_memorized() + 1)
+
+
+        # waiting time segments ################################################
+        segment2_ro  = self.volt2bit_2(np.zeros(16*50))
+        segment2_ex = self.volt2bit_2(np.zeros(16*50))
+        # Putting the segment in AWG memory
+        self._arbitrary_waveform_generator.send_waveform(segment2_ro,
+                            self._awg_routing['firsttone_channel'], self.get_number_segments_memorized() + 2)
+        self._arbitrary_waveform_generator.send_waveform(segment2_ro,
+                            self._awg_routing['thirdtone_channel'], self.get_number_segments_memorized() + 2)
+        self._arbitrary_waveform_generator.send_waveform(segment2_ex,
+                            self._awg_routing['secondtone_channel'], self.get_number_segments_memorized() + 2)
+
+        # excitations and readout segments ######################################
+        p_qb = [self.get_temp_start_secondtone(), self.get_temp_length_secondtone(),
+            amplitude, self.get_down_converted_frequency()*1e9]
+
+        segment3_ex = self.volt2bit_2(self.cos(p_qb, time))
+        self._arbitrary_waveform_generator.send_waveform(segment3_ex,
+                            self._awg_routing['secondtone_channel'], self.get_number_segments_memorized() + 3)
+
+        p_qb2 = [self.get_temp_start_thirdtone(), self.get_temp_length_thirdtone(),
+            amplitude, self.get_down_converted_frequency()*1e9]
+
+        segment3_ex2 = self.volt2bit_2(self.cos(p_qb2, time))
+        self._arbitrary_waveform_generator.send_waveform(segment3_ex2,
+                            self._awg_routing['thirdtone_channel'], self.get_number_segments_memorized() + 3)
+
+        p = [self.get_temp_start_firsttone(), self.get_temp_length_firsttone(),
+            amplitude, self.get_down_converted_frequency()*1e9]
+        segment3_ro  = self.volt2bit_2(self.cos(p, time))
+        segment3_ro = self._arbitrary_waveform_generator.add_markers_mask(\
+            self._awg_routing['board_marker'],
+            np.int(self.get_marker1_start()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+            np.int(self.get_marker1_width()*self._arbitrary_waveform_generator.get_clock_freq()*1e6),
+            segment3_ro)
+        self._arbitrary_waveform_generator.send_waveform(segment3_ro,
+                            self._awg_routing['firsttone_channel'], self.get_number_segments_memorized() + 3)
+
+        for i in np.arange(self._M + self.get_pulsenumber_averaging() + 1):
+            if i == self._M + self.get_pulsenumber_averaging():
+                # Segment triggering the change of smb frequency
+                self._awg_waves['threetone']['binary'][self._awg_routing['firsttone_channel']].append(segment1_ro)
+                self._awg_waves['threetone']['binary'][self._awg_routing['thirdtone_channel']].append(segment1_ro)
+                self._awg_waves['threetone']['binary'][self._awg_routing['secondtone_channel']].append(segment1_ex)
+                self._seq_list.append([1, self.get_number_segments_memorized() + 1, 0])
+
+            elif i < self._M:
+                # waiting time segments
+                self._awg_waves['threetone']['binary'][self._awg_routing['firsttone_channel']].append(segment2_ro)
+                self._awg_waves['threetone']['binary'][self._awg_routing['thirdtone_channel']].append(segment2_ro)
+                self._awg_waves['threetone']['binary'][self._awg_routing['secondtone_channel']].append(segment2_ex)
+                self._seq_list.append([1, self.get_number_segments_memorized() + 2, 0])
+            else:
+                # excitation and readout segments
+                self._awg_waves['threetone']['binary'][self._awg_routing['firsttone_channel']].append(segment3_ro)
+                self._awg_waves['threetone']['binary'][self._awg_routing['thirdtone_channel']].append(segment3_ex2)
+                self._awg_waves['threetone']['binary'][self._awg_routing['secondtone_channel']].append(segment3_ex)
+
+                self._seq_list.append([1, self.get_number_segments_memorized() + 3, 0])
+
+
+        self._seq_list = np.array(self._seq_list)
+        self.set_awg_segmentation({'threetone': self.get_number_segments_memorized() + 1 + np.arange(3)} )
+
+        self._arbitrary_waveform_generator.channel_select(self._awg_routing['firsttone_channel'])
+        self._arbitrary_waveform_generator.send_seq(self._seq_list, self._sequence_dict['threetone'])
+
+        self._arbitrary_waveform_generator.channel_select(self._awg_routing['thirdtone_channel'])
+        self._arbitrary_waveform_generator.send_seq(self._seq_list, self._sequence_dict['threetone'])
+
+        self._arbitrary_waveform_generator.channel_select(self._awg_routing['secondtone_channel'])
+        self._arbitrary_waveform_generator.send_seq(self._seq_list, self._sequence_dict['threetone'])
+        self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['threetone'])
+
+        self._arbitrary_waveform_generator.set_ref_source('EXT')
+        self._arbitrary_waveform_generator.set_ref_freq(10)
+        self._arbitrary_waveform_generator.set_clock_freq(1e3)
+        self._arbitrary_waveform_generator.set_channels_synchronised('ON')
+        self._arbitrary_waveform_generator.set_trigger_source('EVEN')
+
+        self._arbitrary_waveform_generator.set_m2_marker_high_1_2(1.)
+        self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
+
+        self._arbitrary_waveform_generator.seq_jump_source('BUS')
+        self._arbitrary_waveform_generator.seq_mode('STEP')
+        self._arbitrary_waveform_generator.set_trigger_mode('NORM')
+        self._arbitrary_waveform_generator.set_trigger_timer_mode('TIME')
+        self._arbitrary_waveform_generator.set_run_mode('TRIG')
+        self._arbitrary_waveform_generator.set_func_mode('SEQ')
+        self._arbitrary_waveform_generator.set_trigger_timer_time(self._trigger_time) #in us
+
+        # switching ON the awg channels and markers
+        self._awg_dict_output[self._awg_routing['firsttone_channel']]('ON')
+        self._awg_dict_output[self._awg_routing['secondtone_channel']]('ON')
+        self._awg_dict_output[self._awg_routing['thirdtone_channel']]('ON')
+        self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
+        self._arbitrary_waveform_generator.set_m2_marker_status_1_2('ON')
+
+
+        ########################################################################
+
+
     def prep_rabi(self, cwf1, cwf2, average, nb_sequences, power_tone1, power_tone2):
         '''
         Preparing the instruments for a Rabi pulses sequence. This function do not
@@ -1309,8 +1679,9 @@ class virtual_pulsing_instrument(Instrument):
         self.set_src2_cw_frequency(cwf2)
 
         self._microwave_generator2.set_power(self._SSB_tone2.get_LO_power())
-        self._board.set_averaging(average)
+
         self._board.set_nb_sequence(nb_sequences)
+        self._board.set_averaging(average)
 
         self._arbitrary_waveform_generator.channel_select(self._awg_routing['firsttone_channel'])
         self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['rabi1'])
@@ -1343,13 +1714,21 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
 
-        if delete:
-            # Emptying the awg
+        if delete == 'all':
+            # Emptying the awg memory
+            self._arbitrary_waveform_generator.delete_segments()
             self._arbitrary_waveform_generator.reset()
             self._arbitrary_waveform_generator.clear_err()
             self._arbitrary_waveform_generator.set_trace_mode('SING')
             self._arbitrary_waveform_generator.delete_segments()
             self._segmentation = {}
+        elif delete == 'segments':
+            n_seg = self.get_awg_segmentation()['rabi1']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
+            n_seg = self.get_awg_segmentation()['rabi2']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
 
         self._arbitrary_waveform_generator.init_channel(self._awg_routing['secondtone_channel'])
         self._awg_dict_coupling[self._awg_routing['secondtone_channel']]('DC')
@@ -1492,8 +1871,9 @@ class virtual_pulsing_instrument(Instrument):
         self.set_src2_cw_frequency(cwf2)
 
         self._microwave_generator2.set_power(self._SSB_tone2.get_LO_power())
-        self._board.set_averaging(average)
         self._board.set_nb_sequence(nb_sequences)
+        self._board.set_averaging(average)
+
 
         self._arbitrary_waveform_generator.channel_select(self._awg_routing['firsttone_channel'])
         self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['relaxation1'])
@@ -1529,13 +1909,21 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
 
-        if delete:
-            # Emptying the awg
+        if delete == 'all':
+            # Emptying the awg memory
+            self._arbitrary_waveform_generator.delete_segments()
             self._arbitrary_waveform_generator.reset()
             self._arbitrary_waveform_generator.clear_err()
             self._arbitrary_waveform_generator.set_trace_mode('SING')
             self._arbitrary_waveform_generator.delete_segments()
             self._segmentation = {}
+        elif delete == 'segments':
+            n_seg = self.get_awg_segmentation()['relaxation1']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
+            n_seg = self.get_awg_segmentation()['relaxation2']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
 
         self._arbitrary_waveform_generator.init_channel(self._awg_routing['secondtone_channel'])
         self._awg_dict_coupling[self._awg_routing['secondtone_channel']]('DC')
@@ -1711,13 +2099,21 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('OFF')
         self._arbitrary_waveform_generator.set_m2_marker_status_1_2('OFF')
 
-        if delete:
-            # Emptying the awg
+        if delete == 'all':
+            # Emptying the awg memory
+            self._arbitrary_waveform_generator.delete_segments()
             self._arbitrary_waveform_generator.reset()
             self._arbitrary_waveform_generator.clear_err()
             self._arbitrary_waveform_generator.set_trace_mode('SING')
             self._arbitrary_waveform_generator.delete_segments()
             self._segmentation = {}
+        elif delete == 'segments':
+            n_seg = self.get_awg_segmentation()['ramsey1']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
+            n_seg = self.get_awg_segmentation()['ramsey2']
+            print n_seg, type(n_seg)
+            self._arbitrary_waveform_generator.delete_segment_i(n_seg)
 
         self._arbitrary_waveform_generator.init_channel(self._awg_routing['secondtone_channel'])
         self._awg_dict_coupling[self._awg_routing['secondtone_channel']]('DC')
@@ -1871,16 +2267,20 @@ class virtual_pulsing_instrument(Instrument):
             self._arbitrary_waveform_generator.sequence_select(self._sequence_dict['IQ'])
             self._awg_dict_output[self._awg_routing['secondtone_channel']]('ON')
 
+            self.set_power_second_tone(power_tone2)
+            amplitude2 = 10**((power_tone2)/10.)
+            print amplitude2
+            self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
         self._arbitrary_waveform_generator.set_trigger_source('EVEN')
 
         self.set_power_first_tone(power_tone1)
         amplitude1 = 10**((power_tone1)/10.)
-        self.set_power_second_tone(power_tone2)
-        amplitude2 = 10**((power_tone2)/10.)
-        print amplitude1, amplitude2
+
+        print amplitude1
         self._awg_dict_amplitude[self._awg_routing['firsttone_channel']](2*amplitude1)
-        self._awg_dict_amplitude[self._awg_routing['secondtone_channel']](2*amplitude2)
+
 
         processus = dt.RealImag_raw(self._board.get_acquisition_time()*1e-9, self._board.get_samplerate()*1e6,
                           self.get_down_converted_frequency()*1e9)
