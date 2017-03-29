@@ -313,7 +313,7 @@ class virtual_pulsing_instrument(Instrument):
         # 29.8
 
         self.add_parameter('pulsenumber_averaging',
-                            flags=Instrument.FLAG_GET,
+                            flags=Instrument.FLAG_GETSET,
                             minval = 1,
                             type=types.FloatType)
         self._pulsenumber_averaging = 50
@@ -343,7 +343,8 @@ class virtual_pulsing_instrument(Instrument):
         self._board.set_trigger_range(1)
         self._board.set_trigger_level(0.2)
         self._board.set_trigger_delay(200.)
-        acq_time = (self._firsttone_temp_length - 0.2e-6)*1e9
+        acq_time = (self._firsttone_temp_length )*1e9
+        # - 0.2e-6)*1e9
         acq_time = np.int(acq_time/128)*128
         # print acq_time
         self._board.set_acquisition_time(acq_time)
@@ -458,12 +459,12 @@ class virtual_pulsing_instrument(Instrument):
         self.add_function('pulse')
 
         self.write_onetone_pulsessequence( delete = 'all')
-        self.write_twotone_pulsessequence(4e-6, 20.1e-6, 20e-6)
+        self.write_twotone_pulsessequence(10e-6, 0.1e-6, 10e-6)
         # self.write_threetone_pulsessequence(50e-9)
         # self.write_Rabi_pulsessequence( 0.2e-6, 1e-9, 0)
         # self.write_Relaxation_pulsessequence( 67e-9, 20e-6, 0.1e-6, 0e-6)
         # self.write_Ramsey_pulsessequence(  200e-9, 20e-6, 5e-6, 0)
-        self.write_IQ( 4e-6)
+        self.write_IQ( 4e-6, 0.1e-6, 4e-6, type='twotone')
 
     ############################################################################
     # GET_SET
@@ -783,7 +784,8 @@ class virtual_pulsing_instrument(Instrument):
         '''
         self._firsttone_temp_length = delta_t
 
-        acq_time = self._firsttone_temp_length - 0.2e-6
+        acq_time = self._firsttone_temp_length
+        #  - 0.2e-6
         acq_time = np.int(1e9*acq_time/128)*128
         self._board.set_acquisition_time(acq_time) # in ns
 
@@ -941,6 +943,12 @@ class virtual_pulsing_instrument(Instrument):
         Get the pulse number averaging.
         '''
         return self._pulsenumber_averaging
+
+    def do_set_pulsenumber_averaging(self, N):
+        '''
+        Set the pulse number averaging.
+        '''
+        self._pulsenumber_averaging = N
 
     def do_get_SSB_conversion_loss(self):
         '''
@@ -1766,7 +1774,7 @@ class virtual_pulsing_instrument(Instrument):
                           self.get_down_converted_frequency()*1e9)
         self._board.measurement_initialization(processor=processus)
 
-    def write_Rabi_pulsessequence(self, Tr_stop, Tr_step, Tr_start=0., delete=False):
+    def write_Rabi_pulsessequence(self, Tr_stop, Tr_step, Tr_start=0., T_meas=4e-6, delete=False):
         '''
         Putting in the awg memory the Rabi pulses sequence and preparing the others instruments.
         Inputs:
@@ -1813,7 +1821,7 @@ class virtual_pulsing_instrument(Instrument):
         self.set_temp_start_secondtone(Tr_stop + Tr_step  - Tr_start)
         self.set_temp_length_secondtone(Tr_start )
         self.set_temp_start_firsttone(self.get_temp_start_secondtone() + self.get_temp_length_secondtone() )
-        self.set_temp_length_firsttone(4e-6)
+        self.set_temp_length_firsttone(T_meas)
         self.set_marker1_start(self.get_temp_start_firsttone())
         self.set_marker1_width(self.get_temp_length_firsttone())
 
@@ -2293,7 +2301,7 @@ class virtual_pulsing_instrument(Instrument):
         self._arbitrary_waveform_generator.set_m1_marker_high_1_2(1.)
         self._arbitrary_waveform_generator.set_m1_marker_status_1_2('ON')
 
-    def prep_IQ(self, cwf1, counts, power_tone1, cwf2='None', power_tone2 = 'None'):
+    def prep_IQ(self, counts, cwf1, power_tone1, cwf2='None', power_tone2 = 'None'):
         '''
         Preparing the instruments for a IQ pulses sequence. The IQ pulses sequence
         can be onetone or twotone.
@@ -2347,7 +2355,7 @@ class virtual_pulsing_instrument(Instrument):
                           self.get_down_converted_frequency()*1e9)
         self._board.measurement_initialization(processor=processus)
 
-    def write_IQ(self, t1, t2=0., type='onetone', delete=False):
+    def write_IQ(self, t1, t1_start=0.1e-6, t2=0., type='onetone', delete=False):
         '''
         Putting in the awg memory the IQ pulses sequence. The IQ pulses sequence
         can be onetone or twotone.
@@ -2405,7 +2413,8 @@ class virtual_pulsing_instrument(Instrument):
         elif type == 'twotone':
             self.set_temp_start_secondtone(100e-9)
             self.set_temp_length_secondtone(t2)
-            self.set_temp_start_firsttone(self.get_temp_start_secondtone() + self.get_temp_length_secondtone())
+            self.set_temp_start_firsttone(t1_start)
+            # self.get_temp_start_secondtone() + self.get_temp_length_secondtone())
             self.set_temp_length_firsttone(t1)
             self.set_marker1_start(self.get_temp_start_firsttone())
             self.set_marker1_width(self.get_temp_length_firsttone())

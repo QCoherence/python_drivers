@@ -730,16 +730,22 @@ class RealImagPerSequence(DataTreatment):
     """
 
 
-    def __init__(self, acquisition_time, samplerate, frequency):
+    def __init__(self, acquisition_time, samplerate, frequency, t_ro = None):
         """
             Input:
                 - acquisition_time (float): in second
                 - samplerate (float): in sample per second
                 - frequency (float): in hertz
+                - t_ro (float): in second
         """
 
         # We need an integer number of oscillations
-        nb_oscillations = int(frequency*acquisition_time)
+        if t_ro == None:
+            # here there is relevant signal on all the acquired data set
+            nb_oscillations = int(frequency*acquisition_time)
+        else:
+            # here there is relevant signal on only the t_ro part of the acquired data set
+            nb_oscillations = int(frequency*t_ro)
 
         if nb_oscillations < 1:
             raise ValueError('The number of acquired oscillations must be larger than 1')
