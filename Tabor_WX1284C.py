@@ -412,6 +412,11 @@ class Tabor_WX1284C(Instrument):
         self.channel_select(ch_id)
         self._visainstrument.write('TRAC:SEL {}'.format(seg_id))
 
+    def inquir(self,command):
+        return self._visainstrument.query(command)
+
+    def Write(self,command):
+        self._visainstrument.write(command)
 
     #Parameters ###############################################################
 

@@ -1,3 +1,4 @@
+#just a test
 # This Python file uses the following encoding: utf-8
 # ATS9360_NPT.py driver for The aquisition board Alzar ATS9360
 # Etienne Dumur <etienne.dumur@neel.cnrs.fr> 2015
@@ -39,7 +40,7 @@ class ATS9360_NPT(Instrument):
         self.add_parameter('clock_source',
             type        = types.StringType,
             flags       = Instrument.FLAG_GETSET,
-            option_list = ('internal', 'external')
+            option_list = ('internal', 'external', 'fast_external')
             )
 
         self.add_parameter('clock_edge',
@@ -137,7 +138,8 @@ class ATS9360_NPT(Instrument):
 
 
         self.allow_clock_sources = {'internal' : ats.INTERNAL_CLOCK,
-                                    'external' : ats.EXTERNAL_CLOCK_10MHz_REF}
+                                    'external' : ats.EXTERNAL_CLOCK_10MHz_REF,
+                                    'fast_external' : ats.FAST_EXTERNAL_CLOCK}
 
         # By default, we don't take into account the TTL mode for the trigger
         self.allow_trigger_ranges = {5   : ats.ETR_5V,
@@ -516,7 +518,7 @@ class ATS9360_NPT(Instrument):
                 #   in the board.
             '''
 
-        if acquisition_time > 256./self.samplerate*1e3:
+        if acquisition_time >= 256./self.samplerate*1e3:
 
             samplesPerRecord      = round(self.samplerate*acquisition_time*1e-3)
             self.samplesPerRecord = int(round(samplesPerRecord/128)*128)
@@ -884,6 +886,19 @@ class ATS9360_NPT(Instrument):
             else:
 
                 raise ValueError('Samplerate not allowed by the board')
+
+        elif self.clock_source == 'fast_external':
+
+            if samplerate >= 300. and samplerate <= 1800.:
+
+                self.samplerate = float(samplerate)
+
+                # To display the new value of acquisition time
+                self.set_acquisition_time(self.samplesPerRecord/self.samplerate*1e3)
+            else:
+
+                raise ValueError('Samplerate not allowed by the board')
+
         else:
 
             raise ValueError('The clock source must be set to "internal"\
@@ -910,7 +925,7 @@ class ATS9360_NPT(Instrument):
 
             Input:
                 - clock_source (string): Must be either "internal" or
-                 "external".
+                 "external" or fast_external.
 
             Output:
                 - None.
@@ -922,7 +937,7 @@ class ATS9360_NPT(Instrument):
         else:
 
             raise ValueError('clock_source argument must be "internal" or \
-                             "external"')
+                             "external" or fast_external')
 
 
 

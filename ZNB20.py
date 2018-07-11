@@ -254,10 +254,24 @@ class ZNB20(Instrument):
 
         # We clear average
         self.averageclear()
-
+        self.set_trigger_link('POIN')
         self.set_status('on')
 
+    def initialize_one_tone_power_sweep(self, traces, Sparams):
 
+        # Linear sweep in frequency
+        self.set_sweeptype('POW')
+
+        # Trigger to immediate
+        self.set_trigger('imm')
+
+        # We create traces in memory
+        self.create_traces(traces, Sparams)
+
+        # No partial measurement
+        self.set_driving_mode('chopped')
+
+        self.set_status('on')
 ###################################################################
 #
 #                           Trace
@@ -495,17 +509,17 @@ class ZNB20(Instrument):
         LINear | LOGarithmic | POWer | CW | POINt | SEGMent
 
         Input:
-            sweeptype (string): LIN, LOG, POW, CW, POIN or SEG
+            sweeptype (string): LIN, LOG, POW, CW, POIN or SEGM
         Output:
             None
         '''
         logging.debug(__name__ +\
                       ' : The type of the sweep is set to %s' % sweeptype)
 
-        if sweeptype.upper() in ('LIN', 'LOG', 'POW', 'CW', 'POIN', 'SEG'):
+        if sweeptype.upper() in ('LIN', 'LOG', 'POW', 'CW', 'POIN', 'SEGM'):
             self._visainstrument.write("SWE:TYPE "+str(sweeptype.upper()))
         else:
-            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
+            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEGM')
 
 
 #########################################################
