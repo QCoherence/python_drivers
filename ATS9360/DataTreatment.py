@@ -513,8 +513,8 @@ class RealImag(DataTreatment):
         """
             Return the amplitude and the phase of the acquired oscillations by
             using the cos, sin method.
-            Return the amplitude in dB and the phase in rad as
-            (amp_mean, amp_std, phase_mean, phase_std)
+            Return the real part and imaginary part in rad as
+            (real_mean, real_std, imag_mean, imag_std)
         """
 
         # Data in volt
@@ -730,11 +730,10 @@ class AmplitudePhasePerSequencedB(DataTreatment):
 
 class RealImagPerSequence(DataTreatment):
     """
-        Return the amplitude and the phase of the acquired sequences by
-        using the cos, sin method.
+        By using the cos, sin method.
         Take into account an integer number of oscillations (bigest one) for the
         calculation.
-        Return the amplitude in V and the phase in rad
+        Return the real part and the imaginary part in rad
     """
 
 
@@ -803,3 +802,71 @@ class RealImagPerSequence(DataTreatment):
 
             #queue_treatment.put((self.real_mean, self.real_std, self.imag_mean, self.imag_std))
             queue_treatment.put((self.real_mean, self.imag_mean))
+
+class RealImag_raw(DataTreatment):
+    """
+        Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
+        using the cos, sin method.
+    """
+
+
+
+    def __init__(self, acquisition_time, samplerate, frequency):
+        """
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+                - frequency (float): in hertz
+        """
+
+        # We need an integer number of oscillations
+        nb_oscillations = int(frequency*acquisition_time)
+
+        if nb_oscillations < 1:
+            raise ValueError('The number of acquired oscillations must be larger than 1')
+
+        # We obtain the number of point in these oscillations
+        self.nb_points  = int(nb_oscillations/frequency*samplerate)
+
+        # We calculate the sin and cos
+        time = np.arange(self.nb_points)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        # Data save
+        self.real_raw = []
+        self.imag_raw = []
+
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
+            using the cos, sin method.
+            Real and imaginary parts will be array of length=averaging
+        """
+
+        # Data in volt
+        data = self.data_in_volt(data)
+
+        # Build cos and sin
+        real = 2.*np.mean(data[:,:self.nb_points]*self.cos, axis=1)
+        imag = 2.*np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+
+        # We obtain the current averaging for both and save them for
+        # the next iteration
+        # self.real_raw.append(real)
+        # self.imag_raw.append(imag)
+
+        self.real_raw = np.concatenate((self.real_raw, real))
+        self.imag_raw = np.concatenate((self.imag_raw, imag))
+        #self.real_std  = self.std_averaging(self.real_std, np.std(real, axis =0))
+
+        # self.imag_mean = self.mean_averaging(self.imag_mean, np.mean(imag, axis=0))
+        #self.imag_std  = self.std_averaging(self.imag_std, np.std(imag, axis=0))
+
+        # queue_treatment.put((self.real_mean, self.real_std,\
+        #                      self.imag_mean, self.imag_std))
+
+        queue_treatment.put((self.real_raw, self.imag_raw))
