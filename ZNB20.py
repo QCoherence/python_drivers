@@ -254,10 +254,24 @@ class ZNB20(Instrument):
 
         # We clear average
         self.averageclear()
-
+        self.set_trigger_link('POIN')
         self.set_status('on')
 
+    def initialize_one_tone_power_sweep(self, traces, Sparams):
 
+        # Linear sweep in frequency
+        self.set_sweeptype('POW')
+
+        # Trigger to immediate
+        self.set_trigger('imm')
+
+        # We create traces in memory
+        self.create_traces(traces, Sparams)
+
+        # No partial measurement
+        self.set_driving_mode('chopped')
+
+        self.set_status('on')
 ###################################################################
 #
 #                           Trace
@@ -362,9 +376,17 @@ class ZNB20(Instrument):
         if data_format.lower() == 'real-imag':
             return real, imag
         elif data_format.lower() == 'db-phase':
-            return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+            try : 
+                return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+            except RuntimeError : 
+                print 'Division by zero error - Phase'
+                return np.ones_like(real)
         elif data_format.lower() == 'amp-phase':
-            return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
+            try : 
+                return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
+            except RuntimeError : 
+                print 'Division by zero error - Amplitude'
+                return np.ones_like(real)
         else:
             raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
 
@@ -495,17 +517,17 @@ class ZNB20(Instrument):
         LINear | LOGarithmic | POWer | CW | POINt | SEGMent
 
         Input:
-            sweeptype (string): LIN, LOG, POW, CW, POIN or SEG
+            sweeptype (string): LIN, LOG, POW, CW, POIN or SEGM
         Output:
             None
         '''
         logging.debug(__name__ +\
                       ' : The type of the sweep is set to %s' % sweeptype)
 
-        if sweeptype.upper() in ('LIN', 'LOG', 'POW', 'CW', 'POIN', 'SEG'):
+        if sweeptype.upper() in ('LIN', 'LOG', 'POW', 'CW', 'POIN', 'SEGM'):
             self._visainstrument.write("SWE:TYPE "+str(sweeptype.upper()))
         else:
-            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEG')
+            raise ValueError('set_sweeptype(): can only set LIN, LOG, POW, CW, POIN or SEGM')
 
 
 #########################################################
@@ -1073,7 +1095,7 @@ class ZNB20(Instrument):
                 None
         '''
 
-        logging.info(__name__+' : Set the power of the instrument')
+        logging.info(__name__+' : Set the number of points for the sweep')
         self._visainstrument.write('sens:sweep:points '+str(points))
 
 
@@ -1104,7 +1126,7 @@ class ZNB20(Instrument):
 
 
             Input:
-                sweeps (int): sweeps of the instrument will be tuned
+                power (float): sweeps of the instrument will be tuned
 
             Output:
                 None

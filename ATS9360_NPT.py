@@ -517,7 +517,7 @@ class ATS9360_NPT(Instrument):
                 #   in the board.
             '''
 
-        if acquisition_time > 256./self.samplerate*1e3:
+        if acquisition_time >= 256./self.samplerate*1e3:
 
             samplesPerRecord      = round(self.samplerate*acquisition_time*1e-3)
             self.samplesPerRecord = int(round(samplesPerRecord/128)*128)
@@ -897,6 +897,7 @@ class ATS9360_NPT(Instrument):
             else:
 
                 raise ValueError('Samplerate not allowed by the board')
+
         else:
 
             raise ValueError('The clock source must be set to "internal"\
@@ -923,7 +924,7 @@ class ATS9360_NPT(Instrument):
 
             Input:
                 - clock_source (string): Must be either "internal" or
-                 "external" or "fast_external".
+                 "external" or fast_external.
 
             Output:
                 - None.
