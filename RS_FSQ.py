@@ -62,16 +62,29 @@ class RS_FSQ(Instrument):
             self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
+<<<<<<< HEAD
+			
+        self._visainstrument.write_termination = '\n'
+        self._visainstrument.read_termination = '\n'
+		
+        self.add_parameter('resBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
+        self.add_parameter('videoBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
+=======
 		
         self.add_parameter('resBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
         self.add_parameter('videoBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
         self.add_parameter('sweep_time', flags=Instrument.FLAG_GETSET, units='s', minval=1e-6, maxval=16e3, type=types.FloatType)
+>>>>>>> a6362a91db786683f26cdcf542adc4335f0bff8c
         self.add_parameter('inputattenuation', flags=Instrument.FLAG_GETSET, units='dB', minval=0, maxval=50, type=types.IntType)
         self.add_parameter('inputattenuationmode', flags=Instrument.FLAG_GETSET, option_list=['AUTO', 'MAN'], type=types.StringType)
         self.add_parameter('centerfrequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=20, maxval=3e10, type=types.FloatType)
         self.add_parameter('averages', flags=Instrument.FLAG_GETSET, minval=1, maxval=10000, type=types.IntType)
         self.add_parameter('numpoints', flags=Instrument.FLAG_GETSET, minval=1, maxval=20001, type=types.IntType)
+<<<<<<< HEAD
+        self.add_parameter('span', flags=Instrument.FLAG_GETSET, units='Hz', minval=10, maxval=2.6e10, type=types.IntType)
+=======
         self.add_parameter('span', flags=Instrument.FLAG_GETSET, units='Hz', minval=0, maxval=2.6e10, type=types.IntType)
+>>>>>>> a6362a91db786683f26cdcf542adc4335f0bff8c
         self.add_parameter('averagetype',flags=Instrument.FLAG_GETSET,  option_list=['RMS', 'LOG', 'SCALAR'], type=types.StringType)
         self.add_function('get_data')
         self.add_function('set_resBWautoOff')
@@ -242,11 +255,16 @@ class RS_FSQ(Instrument):
         Output:
             None
         '''
+<<<<<<< HEAD
+
+        logging.debug(__name__ + ' : Set input attenuation to %.6f' % (numpoints))
+=======
         if numpoints < 155:
             print 'Number of points (%d) too small. Set to minimum 155'%(numpoints)
             numpoints = 155
             
         logging.debug(__name__ + ' : Set number of points to %d' % (numpoints))
+>>>>>>> a6362a91db786683f26cdcf542adc4335f0bff8c
         self._visainstrument.write(':SENSe:SWEep:POINts '+str(numpoints))
 #########################################################
 #
@@ -299,6 +317,8 @@ class RS_FSQ(Instrument):
 #########################################################
 #
 #
+<<<<<<< HEAD
+=======
 #                   Sweep time
 #
 #
@@ -333,6 +353,7 @@ class RS_FSQ(Instrument):
 #########################################################
 #
 #
+>>>>>>> a6362a91db786683f26cdcf542adc4335f0bff8c
 #                   Video Bandwidth
 #
 #
@@ -543,6 +564,18 @@ class RS_FSQ(Instrument):
         '''
         logging.debug(__name__ + ' : Get the data ')
         qt.mstart()
+<<<<<<< HEAD
+        # sweep_time= float(self._visainstrument.query(':SENSe:SWEep:TIME?'))
+        # print sweep_time
+        self._visainstrument.write('*CLS') # we clear the register, ie putting it to 0
+        self._visainstrument.write(':INIT:CONT OFF')
+        self._visainstrument.write(':INIT:IMMediate;*OPC') # when the sweep is finished, the register will be 1
+        while self._visainstrument.query('*ESR?') == '0': 
+            qt.msleep(0.1) # we wait until the register is 1
+
+        datastr = self._visainstrument.query(':TRAC? TRACE'+str(n))
+
+=======
         sweep_time= float(self._visainstrument.query(':SENSe:SWEep:TIME?'))
 #        print sweep_time
         self._visainstrument.write(':INIT:CONT OFF')
@@ -559,6 +592,7 @@ class RS_FSQ(Instrument):
             pass
         finally:
             datastr = self._visainstrument.query(':TRAC? TRACE'+str(n))
+>>>>>>> a6362a91db786683f26cdcf542adc4335f0bff8c
             
         if enable_continuous:
             self._visainstrument.write(':INIT:CONT ON')
@@ -567,7 +601,12 @@ class RS_FSQ(Instrument):
         num_points=self.get_numpoints()
         freq_min=float(self._visainstrument.query(':SENSe:FREQuency:STARt?'))
         freq_max=float(self._visainstrument.query(':SENSe:FREQuency:STOP?'))
+<<<<<<< HEAD
+        freq_step=(freq_max-freq_min)/num_points
+        freq_vec=np.arange(freq_min,freq_max,freq_step)
+=======
         freq_vec=np.linspace(freq_min,freq_max,num_points)
+>>>>>>> a6362a91db786683f26cdcf542adc4335f0bff8c
         data=np.append(freq_vec,arr)
         data=np.transpose(np.reshape(data,(2,num_points)))
         return data
