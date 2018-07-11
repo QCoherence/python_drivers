@@ -1104,7 +1104,7 @@ class ZNB20(Instrument):
 
 
             Input:
-                power (float): sweeps of the instrument will be tuned
+                sweeps (int): sweeps of the instrument will be tuned
 
             Output:
                 None

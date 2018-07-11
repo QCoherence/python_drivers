@@ -74,8 +74,8 @@ class Virtual_SSB(Instrument):
         self.add_parameter('IF_frequency',
                             flags=Instrument.FLAG_GETSET,
                             units = 'GHz',
-                            minval = 1e-4,
-                            maxval= 0.2,
+                            # minval = 1e-4,
+                            # maxval= 0.5,
                             type=types.FloatType)
 
 

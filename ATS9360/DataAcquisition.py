@@ -67,6 +67,10 @@ class DataAcquisition(object):
 
             decimation = 1
             samplerate = samplerate*1e6 # To get it in S/s
+        elif clock_source == 'fast_external':
+
+            decimation = 1
+            samplerate = samplerate*1e6 # To get it in S/s
         else:
 
             raise ValueError('The clock source must be "internal" or\
@@ -240,7 +244,12 @@ class DataAcquisition(object):
             bytesPerRecord=fft_module.fftSetup(channels, samplesPerRecord, fftLength_samples, ats.FFT_OUTPUT_FORMAT_U16_AMP2, ats.FFT_FOOTER_NONE,0)
 
             bytesPerBuffer   = bytesPerRecord * recordsPerBuffer
-            parameters['samplesPerRecord'] = bytesPerRecord/bytesPerSample
+
+            # change made by Remy the 2018/06/21
+            parameters['samplesPerRecord'] = int(bytesPerRecord/bytesPerSample)
+            # before it was:
+            # parameters['samplesPerRecord'] = bytesPerRecord/bytesPerSample
+
 
         else:
 
@@ -250,7 +259,10 @@ class DataAcquisition(object):
 
             bytesPerRecord   = bytesPerSample * samplesPerRecord
             bytesPerBuffer   = bytesPerRecord * recordsPerBuffer * channelCount
-            parameters['samplesPerRecord'] = bytesPerRecord/bytesPerSample
+            # change made by Remy the 2018/06/21
+            parameters['samplesPerRecord'] = int(bytesPerRecord/bytesPerSample)
+            # before it was:
+            # parameters['samplesPerRecord'] = bytesPerRecord/bytesPerSample
 
         # Select number of DMA buffers to allocate
         bufferCount = parameters['nb_buffer_allocated']
