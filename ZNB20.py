@@ -376,9 +376,17 @@ class ZNB20(Instrument):
         if data_format.lower() == 'real-imag':
             return real, imag
         elif data_format.lower() == 'db-phase':
-            return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+            try : 
+                return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+            except RuntimeError : 
+                print 'Division by zero error - Phase'
+                return np.ones_like(real)
         elif data_format.lower() == 'amp-phase':
-            return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
+            try : 
+                return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
+            except RuntimeError : 
+                print 'Division by zero error - Amplitude'
+                return np.ones_like(real)
         else:
             raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
 
@@ -1087,7 +1095,7 @@ class ZNB20(Instrument):
                 None
         '''
 
-        logging.info(__name__+' : Set the power of the instrument')
+        logging.info(__name__+' : Set the number of points for the sweep')
         self._visainstrument.write('sens:sweep:points '+str(points))
 
 
