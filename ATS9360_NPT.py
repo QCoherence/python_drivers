@@ -1,4 +1,3 @@
-#just a test
 # This Python file uses the following encoding: utf-8
 # ATS9360_NPT.py driver for The aquisition board Alzar ATS9360
 # Etienne Dumur <etienne.dumur@neel.cnrs.fr> 2015
