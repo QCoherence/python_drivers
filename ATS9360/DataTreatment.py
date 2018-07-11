@@ -19,6 +19,7 @@
 import numpy as np
 import time
 import multiprocessing as mp
+import scipy.signal as scisig
 
 class DataTreatment(object):
     """
@@ -59,11 +60,18 @@ class DataTreatment(object):
         """
 
         # We reshape them in 2D-array to enhance the averaging
+        # print type(parameters['records_per_buffer'])
+        # print type(parameters['samplesPerRecord'])
+        # print parameters['records_per_buffer']
+        # print parameters['samplesPerRecord']
+
+
         return np.reshape(data, (parameters['records_per_buffer'],parameters['samplesPerRecord']))
 
 
 
     def mean_averaging(self, current_average, new_data):
+        # print self.treated_sequance
 
         return (self.treated_sequance*current_average + new_data)\
               /(self.treated_sequance + 1.)
@@ -116,7 +124,7 @@ class DataTreatment(object):
                         queue_treatment, parameters)
             i += 1
 
-        # If thre is data left but not enough to sen a package, we store
+        # If there is data left but not enough to send a package, we store
         # them for the next buffer.
         i -= 1
         if (i + 2)*parameters['nb_sequence'] - self.data_stored.shape[0] != data.shape[0]:
@@ -259,9 +267,13 @@ class Average(DataTreatment):
 
         # We obtain the current averaging for both and save them for
         # the next iteration
+
+        # self.mean = self.mean_averaging(self.mean, data)
+        # self.std  = self.std_averaging(self.std, data)
         self.mean = self.mean_averaging(self.mean, np.mean(data, axis=0))
         self.std  = self.std_averaging(self.std, np.std(data, axis=0))
 
+        # print 'data', np.shape(data)
         # Send the result with the amplitude in V
         queue_treatment.put((self.mean, self.std))
 
@@ -271,17 +283,20 @@ class Average_time(DataTreatment):
         Class performing the average of the acquired data.
     """
 
-    def __init__(self,acquisition_time, samplerate):
+    def __init__(self):
+    # __init__(self,acquisition_time, samplerate):
         """
             Input:
                 - acquisition_time (float): in second
                 - samplerate (float): in sample per second
         """
-        length=int(acquisition_time*samplerate)
+        # length=int(acquisition_time*samplerate)
 
         # We initialize np.array with the right dimension
-        self.mean = np.zeros(length)
-        self.std  = np.zeros(length)
+        # self.mean = np.zeros(length)
+        # self.std  = np.zeros(length)
+        self.mean = 0.
+        self.std  = 0.
 
     def process(self, data, queue_treatment, parameters):
         """
@@ -632,8 +647,6 @@ class AmplitudePhasePerSequencedB(DataTreatment):
         calculation.
         Return the amplitude in dB and the phase in rad
     """
-
-
     def __init__(self, acquisition_time, samplerate, frequency, input_power,
                  impedance = 50.):
         """
@@ -672,7 +685,6 @@ class AmplitudePhasePerSequencedB(DataTreatment):
         self.set_input_power(input_power)
 
 
-
     def set_input_power(self, input_power):
         """
             Set the input power.
@@ -683,10 +695,6 @@ class AmplitudePhasePerSequencedB(DataTreatment):
         # We save the input power in V
         self.input_amplitude = np.sqrt(1e-3*10**(input_power/10.)\
                                        *self.impedance)
-
-
-
-
 
 
     def process(self, data, queue_treatment, parameters):
@@ -737,16 +745,22 @@ class RealImagPerSequence(DataTreatment):
     """
 
 
-    def __init__(self, acquisition_time, samplerate, frequency):
+    def __init__(self, acquisition_time, samplerate, frequency, t_ro = None):
         """
             Input:
                 - acquisition_time (float): in second
                 - samplerate (float): in sample per second
                 - frequency (float): in hertz
+                - t_ro (float): in second
         """
 
         # We need an integer number of oscillations
-        nb_oscillations = int(frequency*acquisition_time)
+        if t_ro == None:
+            # here there is relevant signal on all the acquired data set
+            nb_oscillations = int(frequency*acquisition_time)
+        else:
+            # here there is relevant signal on only the t_ro part of the acquired data set
+            nb_oscillations = int(frequency*t_ro)
 
         if nb_oscillations < 1:
             raise ValueError('The number of acquired oscillations must be larger than 1')
@@ -779,23 +793,6 @@ class RealImagPerSequence(DataTreatment):
             real_mean = self.mean_averaging(self.real_mean, real)
             imag_mean = self.mean_averaging(self.imag_mean, imag)
 
-            # If we can calculate the standard deviation
-            # if self.treated_buffer < 2:
-            #
-            #     self.real_std = real_mean
-            #     self.imag_std = imag_mean
-            # else:
-            #
-            #     self.real_std = np.sqrt((self.treated_buffer - 1.)*self.real_std**2.\
-            #                              /self.treated_buffer
-            #                              + (real - self.real_mean)**2.\
-            #                             /(self.treated_buffer + 1.))
-            #
-            #     self.imag_std = np.sqrt((self.treated_buffer - 1.)*self.imag_std**2.\
-            #                              /self.treated_buffer
-            #                              + (imag - self.imag_mean)**2.\
-            #                             /(self.treated_buffer + 1.))
-            #
 
             self.real_mean = real_mean
             self.imag_mean = imag_mean
@@ -803,13 +800,12 @@ class RealImagPerSequence(DataTreatment):
             #queue_treatment.put((self.real_mean, self.real_std, self.imag_mean, self.imag_std))
             queue_treatment.put((self.real_mean, self.imag_mean))
 
+
 class RealImag_raw(DataTreatment):
     """
         Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
         using the cos, sin method.
     """
-
-
 
     def __init__(self, acquisition_time, samplerate, frequency):
         """
@@ -840,6 +836,330 @@ class RealImag_raw(DataTreatment):
 
 
 
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
+            using the cos, sin method.
+            Real and imaginary parts will be array of length=averaging
+        """
+
+        # Data in volt
+        data = self.data_in_volt(data)
+        # Build cos and sin
+        real = 2.*np.mean(data[:,:self.nb_points]*self.cos, axis=1)
+        imag = 2.*np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+
+        # We obtain the current averaging for both and save them for
+        # the next iteration
+        self.real_raw =  real
+        self.imag_raw = imag
+
+        # self.real_raw = np.concatenate((self.real_raw, real))
+        # self.imag_raw = np.concatenate((self.imag_raw, imag))
+        #self.real_std  = self.std_averaging(self.real_std, np.std(real, axis =0))
+
+        # self.imag_mean = self.mean_averaging(self.imag_mean, np.mean(imag, axis=0))
+        #self.imag_std  = self.std_averaging(self.imag_std, np.std(imag, axis=0))
+
+        # queue_treatment.put((self.real_mean, self.real_std,\
+        #                      self.imag_mean, self.imag_std))
+
+        queue_treatment.put((self.real_raw, self.imag_raw))
+
+
+class Average_IQ(DataTreatment):
+    """
+        Class performing the average of the acquired data.
+    """
+
+    def __init__(self, acquisition_time, samplerate, frequency, f_cutoff, order=1):
+
+        # We obtain the number of point in these oscillations
+        self.nb_points = int(samplerate*acquisition_time)
+
+        # print 'size:', self.nb_points
+        # We calculate the sin and cos
+        time = np.arange(self.nb_points)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        # self.mat = np.zeros((self.nb_points, self.nb_points))
+
+
+        beta = f_cutoff/samplerate
+        # alpha = 1. - beta
+
+        # for i in np.arange(self.nb_points):
+                # for j in np.arange(self.nb_points):
+                #     if j<i or j==i:
+                #         self.mat[i,j] = alpha**(i-j)
+
+        # self.mat = self.mat*beta
+        # for i in np.arange(order-1):
+        #     print i
+        #     self.mat = np.dot(self.mat, self.mat)
+
+        # if order == 0:
+        #     self.mat = np.identity(self.nb_points)
+        self.B, self.A = scisig.butter(order, beta, btype='low' )
+        # Data save
+        self.real = np.zeros(self.nb_points)
+
+        self.imag = np.zeros(self.nb_points)
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Calculate the average of the current buffer and average it with
+            the previous measured data.
+            Return the data in the memory buffer as the following:
+            (data, std)
+        """
+
+        # We obtain the data in volt
+        data = self.data_in_volt(data)
+
+        real = 2.*data*self.cos
+        imag = 2.*data*self.sin
+        # print 'dt real',np.shape(real)
+
+        # we filter the 2 omega
+        # real_filtered = np.dot(self.mat, real)
+        # imag_filtered = np.dot(self.mat, imag)
+        # real_filtered = scisig.filtfilt(self.B, self.A, real)
+        # imag_filtered = scisig.filtfilt(self.B, self.A, imag)
+
+        real_filtered = scisig.lfilter(self.B, self.A, real)
+        imag_filtered = scisig.lfilter(self.B, self.A, imag)
+        # print 'dt real filtered',np.shape(real_filtered)
+
+        # # We obtain the current averaging for both
+        real = self.mean_averaging(self.real, real_filtered)
+        imag = self.mean_averaging(self.imag, imag_filtered)
+
+        # print np.shape(real)
+        # print type(real)
+        self.real = real
+        self.imag = imag
+
+        # Send the result with the real and imaginary parts in V
+        queue_treatment.put((self.real, self.imag))
+
+################################################################################
+# Test Remy 2017_11_21
+################################################################################
+
+class SeveralRealImagPerSequence(DataTreatment):
+    """
+        By using the cos, sin method.
+        Take into account an integer number of oscillations (bigest one) for the
+        calculation.
+        Return the real part and the imaginary part in V
+    """
+
+
+    def __init__(self, acquisition_time, samplerate, frequency, N, *args):
+        """
+        To BE tested!
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+                - frequency (float): in hertz
+                - N (int): number of acquisition pulses
+                - *args : sequence in the form ((t_RO_1_start, t_RO_1_stop),
+                    (t_RO_2_start, t_RO_2_stop),...., (t_RO_N_start, t_RO_N_stop))
+        """
+
+        if len(args) != N:
+            raise ValueError('The number of time tuple should be equal to N')
+
+        # We need an integer number of oscillations
+        # if t_ro == None:
+        #     # here there is relevant signal on all the acquired data set
+        #     nb_oscillations = int(frequency*acquisition_time)
+        # else:
+        #     # here there is relevant signal on only the t_ro part of the acquired data set
+        #     nb_oscillations = int(frequency*t_ro)
+        #
+        # if nb_oscillations < 1:
+        #     raise ValueError('The number of acquired oscillations must be larger than 1')
+
+        # We obtain the number of point in these oscillations
+        self.nb_points = np.reshape(np.zeros(2*N), (N,2))
+        for i in np.arange(N):
+            self.nb_points[i,0]  = int( int(frequency*(arg[i][0])) /frequency*samplerate)
+            self.nb_points[i,1]  = int( int(frequency*(arg[i][1])) /frequency*samplerate)
+
+        # We calculate the sin and cos
+        time = np.arange(self.nb_points[-1, 1])/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        self.real_mean = np.zeros(N)
+        self.real  =  np.zeros(N)
+        self.imag_mean =  np.zeros(N)
+        self.imag =  np.zeros(N)
+
+        self.N = N
+
+
+    def process(self, data, queue_treatment, parameters):
+
+            # Data in volt
+            data = self.data_in_volt(data)
+
+            # Build cos and sin
+            for i in np.arange(self.N):
+                self.real[i] = 2.*np.mean(data[:,self.nb_points[i,0]:self.nb_points[i,1]]*self.cos, axis=1)
+                self.imag[i] = 2.*np.mean(data[:,self.nb_points[i,0]:self.nb_points[i,1]]*self.sin, axis=1)
+
+            # We obtain the current averaging for both
+            self.real_mean  = self.mean_averaging(self.real_mean, self.real)
+            self.imag_mean = self.mean_averaging(self.imag_mean, self.imag)
+
+
+            #queue_treatment.put((self.real_mean, self.real_std, self.imag_mean, self.imag_std))
+            queue_treatment.put((self.real_mean, self.imag_mean))
+
+################################################################################
+# reset
+################################################################################
+
+class RealImagPerSequence_reset(DataTreatment):
+    """
+        By using the cos, sin method.
+        Take into account an integer number of oscillations (bigest one) for the
+        calculation.
+        Return the real part and the imaginary part in rad
+    """
+
+
+    def __init__(self, acquisition_time, samplerate, frequency, t_ro = None):
+        """
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+                - frequency (float): in hertz
+                - t_ro (float): in second
+        """
+
+        # We need an integer number of oscillations
+        if t_ro == None:
+            # here there is relevant signal on all the acquired data set
+            nb_oscillations = int(frequency*acquisition_time)
+        else:
+            # here there is relevant signal on only the t_ro part of the acquired data set
+            nb_oscillations = int(frequency*t_ro)
+
+        if nb_oscillations < 1:
+            raise ValueError('The number of acquired oscillations must be larger than 1')
+
+        # We obtain the number of point in these oscillations
+        self.nb_points  = int(nb_oscillations/frequency*samplerate)
+
+        # We calculate the sin and cos
+        time = np.arange(self.nb_points)/samplerate
+
+        self.cos = np.cos(2.*np.pi*frequency*time)
+        self.sin = np.sin(2.*np.pi*frequency*time)
+
+        self.real= 0.
+        self.imag = 0.
+
+
+    def process(self, data, queue_treatment, parameters):
+
+            # Data in volt
+            data = self.data_in_volt(data)
+
+            # Build cos and sin
+            self.real = 2.*np.mean(data[:,:self.nb_points]*self.cos, axis=1)
+            self.imag = 2.*np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+
+
+            queue_treatment.put((self.real, self.imag))
+
+
+################################################################################
+
+class HomodyneRealImagPerSequence(DataTreatment):
+    """
+        By using the homodyne method.
+        Return the real part and the imaginary part in V
+    """
+
+
+    def __init__(self, pulse_time, samplerate, delta_t):
+        """
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+                - t_ro (float): in second
+        """
+
+        # We need an integer number of oscillations
+
+        self.nb_points = int(samplerate*pulse_time)
+        self.nb_points2 = int(samplerate*(pulse_time+delta_t))
+        print self.nb_points, self.nb_points2
+        if self.nb_points < 1:
+            raise ValueError('The number of acquired points must be larger than 1')
+
+
+        self.data_mean_sig = 0.
+        self.data_mean_no_sig = 0.
+
+
+    def process(self, data, queue_treatment, parameters):
+
+            # Data in volt
+            data = self.data_in_volt(data)
+            # print np.shape(data)
+            # print self.nb_points
+
+            # Build cos and sin
+            data_sig = np.mean(data[:,:self.nb_points], axis=1)
+            data_no_sig = np.mean(data[:,self.nb_points2:], axis=1)
+            # print np.shape(data)
+            # We obtain the current averaging for both
+            data_mean_sig = self.mean_averaging(self.data_mean_sig, data_sig)
+            data_mean_no_sig = self.mean_averaging(self.data_mean_no_sig, data_no_sig)
+
+
+            self.data_mean_sig = data_mean_sig
+            self.data_mean_no_sig = data_mean_no_sig
+
+            queue_treatment.put((self.data_mean_sig, self.data_mean_no_sig))
+
+class HomodyneRealImag_raw(DataTreatment):
+    """
+        Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
+        using the cos, sin method.
+    """
+
+    def __init__(self, pulse_time, samplerate, delta_t):
+        """
+            Input:
+                - pulse_time (float): in second
+                - samplerate (float): in sample per second
+
+        """
+
+
+        # We obtain the number of point in these oscillations
+        self.nb_points  = int(pulse_time*samplerate)
+        self.nb_points2 = int((pulse_time+delta_t)*samplerate)
+
+        # Data save
+        self.data_pulse_raw = []
+        self.data_nopulse_raw = []
+
+
+
+
     def process(self, data, queue_treatment, parameters):
         """
             Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
@@ -850,23 +1170,373 @@ class RealImag_raw(DataTreatment):
         # Data in volt
         data = self.data_in_volt(data)
 
-        # Build cos and sin
-        real = 2.*np.mean(data[:,:self.nb_points]*self.cos, axis=1)
-        imag = 2.*np.mean(data[:,:self.nb_points]*self.sin, axis=1)
+        self.data_pulse_raw = np.mean(data[:,:self.nb_points], axis=1)
+        self.data_nopulse_raw = np.mean(data[:,self.nb_points2:], axis=1)
 
-        # We obtain the current averaging for both and save them for
-        # the next iteration
-        # self.real_raw.append(real)
-        # self.imag_raw.append(imag)
 
-        self.real_raw = np.concatenate((self.real_raw, real))
-        self.imag_raw = np.concatenate((self.imag_raw, imag))
-        #self.real_std  = self.std_averaging(self.real_std, np.std(real, axis =0))
+        queue_treatment.put((self.data_pulse_raw, self.data_nopulse_raw))
 
-        # self.imag_mean = self.mean_averaging(self.imag_mean, np.mean(imag, axis=0))
-        #self.imag_std  = self.std_averaging(self.imag_std, np.std(imag, axis=0))
+class HomodyneRealImag_raw_sevRO(DataTreatment):
+    """
+        Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
+        using the cos, sin method.
+    """
 
-        # queue_treatment.put((self.real_mean, self.real_std,\
-        #                      self.imag_mean, self.imag_std))
+    def __init__(self, pulse_time1, t1_start, pulse_time2, t2_start, samplerate, delta_t):
+        """
+            Input:
+                - pulse_time (float): in second
+                - samplerate (float): in sample per second
 
-        queue_treatment.put((self.real_raw, self.imag_raw))
+        """
+
+
+        # We obtain the number of point in these oscillations
+        self.nb_points_start1 = int(t1_start*samplerate)
+        self.nb_points_end1   = int((t1_start+pulse_time1)*samplerate)
+
+        self.nb_points_start2 = int(t2_start*samplerate)
+        self.nb_points_end2   = int((t2_start+pulse_time2)*samplerate)
+        self.nb_points_stop = self.nb_points_end2 + int(delta_t*samplerate)
+
+        # Data save
+        self.data_pulse_raw1 = []
+        self.data_pulse_raw2 = []
+        self.data_nopulse_raw = []
+
+
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
+            using the cos, sin method.
+            Real and imaginary parts will be array of length=averaging
+        """
+
+        # Data in volt
+        data = self.data_in_volt(data)
+
+        self.data_pulse_raw1 = np.mean(data[:,self.nb_points_start1:self.nb_points_end1], axis=1)
+        self.data_pulse_raw2 = np.mean(data[:,self.nb_points_start2:self.nb_points_end2], axis=1)
+        self.data_nopulse_raw = np.mean(data[:,self.nb_points_stop:], axis=1)
+
+        # self.data_pulse_raw1 -= self.data_nopulse_raw
+        # self.data_pulse_raw2 -= self.data_nopulse_raw
+        queue_treatment.put((self.data_pulse_raw1, self.data_pulse_raw2, self.data_nopulse_raw))
+
+
+class HomodyneRealImag_Nraw(DataTreatment):
+    """
+        By using the homodyne method.
+        Return the real part and the imaginary part in V
+    """
+
+
+    def __init__(self, pulse_time, samplerate, delta_t, N):
+        """
+            Input:
+                - acquisition_time (float): in second
+                - samplerate (float): in sample per second
+        """
+
+        # We need an integer number of oscillations
+        self.N = N
+        self.nb_points = int(samplerate*pulse_time)
+        self.nb_points_tot = N*self.nb_points
+        self.nb_points2 =  int((N*pulse_time+delta_t)*samplerate)
+
+        self.data_pulse_raw = []
+        for i in np.arange(N):
+            self.data_pulse_raw.append([])
+        self.data_nopulse_raw = 0.
+
+
+    def process(self, data, queue_treatment, parameters):
+
+            # Data in volt
+            data = self.data_in_volt(data)
+
+            for i in np.arange(self.N):
+                self.data_pulse_raw[i][:] = np.mean(data[:,i*self.nb_points:(i+1)*self.nb_points], axis=1)
+
+            self.data_nopulse_raw = np.mean(data[:,self.nb_points2:], axis=1)
+
+            # self.data_pulse_raw -= self.data_nopulse_raw
+
+            queue_treatment.put((self.data_pulse_raw, self.data_nopulse_raw) )
+
+# class Homodyne_Tchebytchev(DataTreatment):
+#     """
+#         Class performing the Tchebytchev data.
+#     """
+#
+#     def __init__(self, acquisition_time, samplerate, tau, t0):
+#
+#         # We obtain the number of point in these oscillations
+#         self.nb_points = int(samplerate*acquisition_time)
+#         self.N_tau = int(samplerate*tau)
+#         self.nb_points0 = int(samplerate*t0)
+#
+#         # Data save
+#         self.data = np.reshape(np.zeros(4*self.nb_points), (4, self.nb_points))
+#         self.data_old = np.reshape(np.zeros(4*self.nb_points), (4, self.nb_points))
+#
+#     def process(self, data, queue_treatment, parameters):
+#         """
+#             Calculate the average of the current buffer and average it with
+#             the previous measured data.
+#             Return the data in the memory buffer as the following:
+#             (data, std)
+#         """
+#
+#         # We obtain the data in volt
+#         data = self.data_in_volt(data)
+#         # print np.shape(data)
+#         data0 = np.mean(data[:,:self.nb_points0], axis=1)
+#
+#         # imag_filtered = scisig.filtfilt(self.B, self.A, imag)
+#         for i in np.arange(len(data[:,0])):
+#             # print i
+#             self.data[i,:] = np.convolve(data[i,:]- data0[i], np.ones(self.N_tau)/self.N_tau, mode='same')
+#
+#         # # We obtain the current averaging for both
+#         # self.data = data_filtered
+#         # self.data_old = self.mean_averaging(self.data_old, self.data)
+#
+#
+#         # Send the result with the real and imaginary parts in V
+#         queue_treatment.put((self.data_old))
+
+class Homodyne_Tchebytchev(DataTreatment):
+    """
+        Class performing the Tchebytchev data.
+    """
+
+    def __init__(self, acquisition_time, samplerate, f_cutoff, r_dB, order, doweaverage):
+
+        # We obtain the number of point
+        self.nb_points = int(samplerate*acquisition_time)
+        self.doweaverage = doweaverage
+        beta = f_cutoff/samplerate
+
+        self.B, self.A = scisig.cheby2(order, r_dB, beta, btype='low' )
+        # Data save
+        self.data = np.zeros(self.nb_points)
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Calculate the average of the current buffer and average it with
+            the previous measured data.
+            Return the data in the memory buffer as the following:
+            (data, std)
+        """
+
+        # We obtain the data in volt
+        data = self.data_in_volt(data)
+        # print np.shape(data)
+        data_filtered = scisig.lfilter(self.B, self.A, data,  axis=1)
+        # print np.shape(data_filtered)
+
+        if self.doweaverage:
+            self.data = self.mean_averaging(self.data, data_filtered)
+        else:
+            self.data = data_filtered
+
+        queue_treatment.put((self.data))
+
+
+class HomodyneRealImagPerSequenceWeighted(DataTreatment):
+    """
+        By using the homodyne method.
+        Return the real part and the imaginary part in V
+    """
+
+
+    def __init__(self, acquisition_time, pulse_time, samplerate, delta_t, tau, t_start=0.):
+        """
+            Input:
+                - pulse_time (float): in second
+                - samplerate (float): in sample per second
+                - delta_t (float): in second
+                - tau (float): cavity raising time in second
+        """
+
+        self.nb_points_tot = int(samplerate*acquisition_time)
+
+        self.time = np.arange(self.nb_points_tot)/samplerate
+
+        Heavi1 = np.piecewise(self.time-t_start,
+            [(self.time-t_start)<0, (self.time-t_start) == 0, (self.time-t_start)>0],
+            [0., 0.5, 1.] )
+        t_stop = t_start + pulse_time
+        Heavi2 = np.piecewise(self.time-t_stop,
+            [(self.time-t_stop)<0, (self.time-t_stop) == 0, (self.time-t_stop) >0],
+            [0., 0.5, 1.] )
+        self.ideal_pulse = (1.-np.exp(-(self.time-t_start)/tau))*Heavi1 - Heavi2*(1.-np.exp(-(self.time-t_stop)/tau))
+
+        self.nb_points = int(samplerate*pulse_time)
+        self.nb_points2 = int(samplerate*(pulse_time+delta_t))
+        # print self.nb_points, self.nb_points2
+        if self.nb_points < 1:
+            raise ValueError('The number of acquired points must be larger than 1')
+
+
+        self.data_mean_sig = 0.
+        self.data_mean_no_sig = 0.
+
+
+    def process(self, data, queue_treatment, parameters):
+
+            # Data in volt
+            data = self.data_in_volt(data)
+
+            # Build cos and sin
+            data_sig = np.mean(self.ideal_pulse[:self.nb_points]*data[:,:self.nb_points], axis=1)#/np.mean(self.ideal_pulse)
+            data_no_sig = np.mean(data[:,self.nb_points2:], axis=1)
+            # print np.shape(data)
+            # We obtain the current averaging for both
+            data_mean_sig = self.mean_averaging(self.data_mean_sig, data_sig)
+            data_mean_no_sig = self.mean_averaging(self.data_mean_no_sig, data_no_sig)
+
+
+            self.data_mean_sig = data_mean_sig
+            self.data_mean_no_sig = data_mean_no_sig
+
+            queue_treatment.put((self.data_mean_sig, self.data_mean_no_sig))
+
+class HomodyneRealImag_rawWeighted(DataTreatment):
+    """
+        Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
+        using the cos, sin method.
+    """
+
+    def __init__(self, acquisition_time, pulse_time, samplerate, delta_t, tau, t_start=0.):
+        """
+            Input:
+                - pulse_time (float): in second
+                - samplerate (float): in sample per second
+
+        """
+
+        self.nb_points_tot = int(samplerate*acquisition_time)
+        # We obtain the number of point in these oscillations
+        self.nb_points  = int(pulse_time*samplerate)
+        self.nb_points2 = int((pulse_time+delta_t)*samplerate)
+
+        self.time = np.arange(self.nb_points_tot)/samplerate
+        Heavi1 = np.piecewise(self.time-t_start,
+            [(self.time-t_start)<0, (self.time-t_start) == 0, (self.time-t_start)>0],
+            [0., 0.5, 1.] )
+        t_stop = t_start + pulse_time
+        Heavi2 = np.piecewise(self.time-t_stop,
+            [(self.time-t_stop)<0, (self.time-t_stop) == 0, (self.time-t_stop) >0],
+            [0., 0.5, 1.] )
+        self.ideal_pulse = (1.-np.exp(-(self.time-t_start)/tau))*Heavi1 - Heavi2*(1.-np.exp(-(self.time-t_stop)/tau))
+
+        # Data save
+        self.data_pulse_raw = []
+        self.data_nopulse_raw = []
+
+
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
+            using the cos, sin method.
+            Real and imaginary parts will be array of length=averaging
+        """
+
+        # Data in volt
+        data = self.data_in_volt(data)
+
+        # self.data_pulse_raw = np.mean(data[:,:self.nb_points], axis=1)
+        self.data_pulse_raw = np.mean(self.ideal_pulse[None, :self.nb_points]*data[:,:self.nb_points], axis=1)#\
+                            #/np.mean(self.ideal_pulse)
+        self.data_nopulse_raw = np.mean(data[:,self.nb_points2:], axis=1)
+
+
+        queue_treatment.put((self.data_pulse_raw, self.data_nopulse_raw))
+
+
+class HomodyneRealImag_raw_sevROWeighted(DataTreatment):
+    """
+        Return the raw real and imaginary parts (ie not averaged over N) of the acquired oscillations by
+        using the cos, sin method.
+    """
+
+    def __init__(self, acquisition_time, pulse_time1, t1_start, pulse_time2,
+                                t2_start, samplerate, delta_t, tau):
+        """
+            Input:
+                - pulse_time (float): in second
+                - samplerate (float): in sample per second
+
+        """
+
+        self.nb_points_tot = int(samplerate*acquisition_time)
+        self.time = np.arange(self.nb_points_tot)/samplerate
+
+        # We obtain the number of point in these oscillations
+        self.nb_points_start1 = int(t1_start*samplerate)
+        self.nb_points_end1   = int((t1_start+pulse_time1)*samplerate)
+        Heavi1 = np.piecewise(self.time-t1_start,
+            [(self.time-t1_start)<0, (self.time-t1_start) == 0, (self.time-t1_start)>0],
+            [0., 0.5, 1.] )
+        t_stop = t1_start + pulse_time1
+        Heavi2 = np.piecewise(self.time-t_stop,
+            [(self.time-t_stop)<0, (self.time-t_stop) == 0, (self.time-t_stop) >0],
+            [0., 0.5, 1.] )
+        self.ideal_pulse1 = (1.-np.exp(-(self.time-t1_start)/tau))*Heavi1 - Heavi2*(1.-np.exp(-(self.time-t_stop)/tau))
+
+
+        self.nb_points_start2 = int(t2_start*samplerate)
+        self.nb_points_end2   = int((t2_start+pulse_time2)*samplerate)
+        Heavi1 = np.piecewise(self.time-t2_start,
+            [(self.time-t2_start)<0, (self.time-t2_start) == 0, (self.time-t2_start)>0],
+            [0., 0.5, 1.] )
+        t_stop = t2_start + pulse_time2
+        Heavi2 = np.piecewise(self.time-t_stop,
+            [(self.time-t_stop)<0, (self.time-t_stop) == 0, (self.time-t_stop) >0],
+            [0., 0.5, 1.] )
+        self.ideal_pulse2 = (1.-np.exp(-(self.time-t2_start)/tau))*Heavi1 - Heavi2*(1.-np.exp(-(self.time-t_stop)/tau))
+        print np.mean(self.ideal_pulse1), np.mean(self.ideal_pulse2)
+
+
+        self.nb_points_stop = self.nb_points_end2 + int(delta_t*samplerate)
+
+        # Data save
+        self.data_pulse_raw1 = []
+        self.data_pulse_raw2 = []
+        self.data_nopulse_raw = []
+
+
+
+
+    def process(self, data, queue_treatment, parameters):
+        """
+            Return the raw real and imaginary parts (ie not averaged) of the acquired oscillations by
+            using the cos, sin method.
+            Real and imaginary parts will be array of length=averaging
+        """
+
+        # Data in volt
+        data = self.data_in_volt(data)
+
+        # self.data_pulse_raw1 = np.mean(data[:,self.nb_points_start1:self.nb_points_end1], axis=1)
+
+        self.data_pulse_raw1 = np.mean(self.ideal_pulse1[None,self.nb_points_start1:self.nb_points_end1]\
+                    *data[:,self.nb_points_start1:self.nb_points_end1], axis=1)#\
+                    # /np.mean(self.ideal_pulse1)
+
+        self.data_pulse_raw2 =  np.mean(self.ideal_pulse2[None,self.nb_points_start2:self.nb_points_end2]\
+                    *data[:,self.nb_points_start2:self.nb_points_end2], axis=1)#\
+                    # /np.mean(self.ideal_pulse2)
+        # np.mean(data[:,self.nb_points_start2:self.nb_points_end2], axis=1)
+
+        self.data_nopulse_raw = np.mean(data[:,self.nb_points_stop:], axis=1)
+
+        # self.data_pulse_raw1 -= self.data_nopulse_raw
+        # self.data_pulse_raw2 -= self.data_nopulse_raw
+        queue_treatment.put((self.data_pulse_raw1, self.data_pulse_raw2, self.data_nopulse_raw))

@@ -664,11 +664,11 @@ class Tektronix_AFG3252(Instrument):
             state (string) : reference
         '''
         logging.debug(__name__ + ' :  Get the reference')
-
-        if self._visainstrument.query('source:roscillator:source?') == 'EXT':
-            return 'External'
-        else:
-            return 'Internal'
+        return self._visainstrument.query('source:roscillator:source?')
+        # if self._visainstrument.query('source:roscillator:source?') == 'EXT':
+        #     return 'External'
+        # else:
+        #     return 'Internal'
 
 
 

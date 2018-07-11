@@ -62,7 +62,7 @@ class Virtual_SSB(Instrument):
 
         self.add_parameter('band_type',
                             flags=Instrument.FLAG_GETSET,
-                            option_list= (-1, +1),
+                            option_list= [-1, +1],
                             type=types.FloatType)
 
         self.add_parameter('LO_power',
@@ -74,8 +74,8 @@ class Virtual_SSB(Instrument):
         self.add_parameter('IF_frequency',
                             flags=Instrument.FLAG_GETSET,
                             units = 'GHz',
-                            minval = 1e-4,
-                            maxval= 0.2,
+                            # minval = 1e-4,
+                            # maxval= 0.5,
                             type=types.FloatType)
 
 
@@ -199,8 +199,8 @@ class Virtual_SSB(Instrument):
         Set the bandtype of the SSB
         Input:
             bt:
-                -1 : the SSB is a Lower Side Band
-                +1 : the SSB is a Upper Side Band
+                -1 : the SSB is a Lower Side Band (LSB)
+                +1 : the SSB is a Upper Side Band (USB)
         Output:
             None
         '''
