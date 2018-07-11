@@ -65,12 +65,13 @@ class RS_FSQ(Instrument):
 		
         self.add_parameter('resBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
         self.add_parameter('videoBW', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=3e8, type=types.FloatType)
+        self.add_parameter('sweep_time', flags=Instrument.FLAG_GETSET, units='s', minval=1e-6, maxval=16e3, type=types.FloatType)
         self.add_parameter('inputattenuation', flags=Instrument.FLAG_GETSET, units='dB', minval=0, maxval=50, type=types.IntType)
         self.add_parameter('inputattenuationmode', flags=Instrument.FLAG_GETSET, option_list=['AUTO', 'MAN'], type=types.StringType)
         self.add_parameter('centerfrequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=20, maxval=3e10, type=types.FloatType)
         self.add_parameter('averages', flags=Instrument.FLAG_GETSET, minval=1, maxval=10000, type=types.IntType)
         self.add_parameter('numpoints', flags=Instrument.FLAG_GETSET, minval=1, maxval=20001, type=types.IntType)
-        self.add_parameter('span', flags=Instrument.FLAG_GETSET, units='Hz', minval=10, maxval=2.6e10, type=types.IntType)
+        self.add_parameter('span', flags=Instrument.FLAG_GETSET, units='Hz', minval=0, maxval=2.6e10, type=types.IntType)
         self.add_parameter('averagetype',flags=Instrument.FLAG_GETSET,  option_list=['RMS', 'LOG', 'SCALAR'], type=types.StringType)
         self.add_function('get_data')
         self.add_function('set_resBWautoOff')
@@ -241,8 +242,11 @@ class RS_FSQ(Instrument):
         Output:
             None
         '''
-
-        logging.debug(__name__ + ' : Set input attenuation to %.6f' % (numpoints))
+        if numpoints < 155:
+            print 'Number of points (%d) too small. Set to minimum 155'%(numpoints)
+            numpoints = 155
+            
+        logging.debug(__name__ + ' : Set number of points to %d' % (numpoints))
         self._visainstrument.write(':SENSe:SWEep:POINts '+str(numpoints))
 #########################################################
 #
@@ -292,6 +296,40 @@ class RS_FSQ(Instrument):
 		
 	
 	
+#########################################################
+#
+#
+#                   Sweep time
+#
+#
+#########################################################
+
+    def do_get_sweep_time(self):
+        '''
+        Get the swepp_time
+
+        Input:
+            None
+
+        Output:
+            sweep_time (float) : Sweep_time in s
+        '''
+        logging.debug(__name__ + ' : Get the sweep time')
+        return float(self._visainstrument.ask(':SENSe:SWEep:TIME?'))
+        
+    def do_set_sweep_time(self,sweep_time):
+        '''
+        Set the sweep time
+
+        Input:
+            sweep_time (float) : Sweep time [s]
+
+        Output: 
+            None
+        '''
+        logging.debug(__name__ + ' : Set the sweep time to %.6f' % (sweep_time))
+        self._visainstrument.write('SWE:TIME '+str(sweep_time))
+        
 #########################################################
 #
 #
@@ -512,7 +550,7 @@ class RS_FSQ(Instrument):
         wait_time = 1.05*sweep_time*self.get_averages(query=False)
 ##        print time.ctime()
 #        print 'waiting %f seconds'%wait_time
-        qt.msleep(wait_time+0.5)
+        qt.msleep(wait_time+5)
 #        print time.ctime()
 #        print 'reading'
         try:
@@ -529,8 +567,7 @@ class RS_FSQ(Instrument):
         num_points=self.get_numpoints()
         freq_min=float(self._visainstrument.query(':SENSe:FREQuency:STARt?'))
         freq_max=float(self._visainstrument.query(':SENSe:FREQuency:STOP?'))
-        freq_step=(freq_max-freq_min)/num_points
-        freq_vec=np.arange(freq_min,freq_max,freq_step)
+        freq_vec=np.linspace(freq_min,freq_max,num_points)
         data=np.append(freq_vec,arr)
         data=np.transpose(np.reshape(data,(2,num_points)))
         return data
