@@ -157,7 +157,7 @@ class ATS9360_NPT(Instrument):
 
         # Attributes of the clock
         self.samplerate   = 1000. # In [MS/s], float
-        self.clock_source = 'external'
+        self.clock_source = 'external' #  fast_external
         self.clock_edge   = 'rising'
 
         # Attributes of the trigger
@@ -847,7 +847,7 @@ class ATS9360_NPT(Instrument):
                   1.5e3, 1.8e3.
 
                   If the clock is set to be external (assumed 10MHz external
-                  clock), all samplerates greater than 300MHz and smaller than
+                  clock) or fast_external, all samplerates greater than 300MHz and smaller than
                   1800MHZ being a multiple of 1 MHz are allowed [should be
                   given in MS/s].
 
@@ -901,7 +901,7 @@ class ATS9360_NPT(Instrument):
         else:
 
             raise ValueError('The clock source must be set to "internal"\
-                              or "external".')
+                              or "external" or "fast_external".')
 
 
 
@@ -936,7 +936,7 @@ class ATS9360_NPT(Instrument):
         else:
 
             raise ValueError('clock_source argument must be "internal" or \
-                             "external" or fast_external')
+                             "external" or "fast_external".')
 
 
 

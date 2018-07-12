@@ -61,6 +61,8 @@ class HP3245A(Instrument):
             self._visainstrument = rm.open_resource(self._address)
         except:
             raise SystemExit
+
+        
         self._visainstrument.write_termination = '\r\n'
         self._visainstrument.read_termination = '\r\n'
         # self._visainstrument.term_chars = '\r\n'
@@ -251,7 +253,7 @@ class HP3245A(Instrument):
             self._visainstrument.write('TERM REAR ')
         else:
             raise ValueError('The input parameter should be "FRONT" or "REAR".')
-            
+
     def do_get_output_terminal(self):
         '''
             gets the output terminal, either FRONT or REAR

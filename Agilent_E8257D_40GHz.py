@@ -54,22 +54,22 @@ class Agilent_E8257D_40GHz(Instrument):
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval=-135, maxval=25, type=types.FloatType)
         self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-numpy.pi, maxval=numpy.pi, type=types.FloatType)
         self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=1e5, maxval=40e9, type=types.FloatType)
-        self.add_parameter('RF_status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
+        self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('pulse_status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('pulse_type', flags=Instrument.FLAG_GETSET, option_list=['square', 'frun', 'trigered', 'doublet', 'gated'], type=types.StringType)
         self.add_parameter('pulse_period', flags=Instrument.FLAG_GETSET, units='s', type=types.FloatType)
         self.add_parameter('pulse_width', flags=Instrument.FLAG_GETSET, units='s', type=types.FloatType)
         self.add_parameter('freqsweep', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
-		
-		
+
+
         self.add_function('reset')
         self.add_function ('get_all')
 
 
         if (reset):
-		
+
             self.reset()
-        
+
         self.get_all()
 
     def reset(self):
@@ -101,7 +101,7 @@ class Agilent_E8257D_40GHz(Instrument):
         self.get_power()
         self.get_phase()
         self.get_frequency()
-        self.get_RF_status()
+        self.get_status()
         self.get_pulse_status()
         self.get_pulse_period()
         self.get_pulse_width()
@@ -184,7 +184,7 @@ class Agilent_E8257D_40GHz(Instrument):
         logging.debug(__name__ + ' : set frequency to %f' % freq)
         self._visainstrument.write('FREQ:CW %s' % freq)
 
-    def do_get_RF_status(self):
+    def do_get_status(self):
         '''
         Reads the output status from the instrument
 
@@ -208,7 +208,7 @@ class Agilent_E8257D_40GHz(Instrument):
           raise ValueError('Output status not specified : %s' % stat)
         return
 
-    def do_set_RF_status(self, status):
+    def do_set_status(self, status):
         '''
         Set the output status of the instrument
 
@@ -368,7 +368,7 @@ class Agilent_E8257D_40GHz(Instrument):
         Output:
             None
         '''
-        self.set_RF_status('off')
+        self.set_status('off')
 
     def on(self):
         '''
@@ -380,7 +380,7 @@ class Agilent_E8257D_40GHz(Instrument):
         Output:
             None
         '''
-        self.set_RF_status('on')
+        self.set_status('on')
 
 #########################################################
 #
@@ -469,22 +469,22 @@ class Agilent_E8257D_40GHz(Instrument):
         else:
             raise ValueError('set_sweepmode(): can only set AUTO or SINGLE')
 
-    # def set_spacingfreq(self, spacingfreq='linear'):
-        # '''
-    	# Define the type of frequency spacing for the sweep: linear or log
+    def set_spacingfreq(self, spacingfreq='linear'):
+        '''
+    	Define the type of frequency spacing for the sweep: linear or log
 
-        # Input:
-            # spacingfreq (string): linear or log
-        # Output:
-            # None
-        # '''
-        # logging.debug(__name__ + ' : Spacing frequency is set to %s' % spacingfreq)
-        # if spacingfreq.upper() in ('LINEAR'):
-            # self._visainstrument.write('SWE:SPAC LIN')
-        # elif spacingfreq.upper() in ('LOG'):
-            # self._visainstrument.write('SWE:SPAC LOG')
-        # else:
-            # raise ValueError('set_spacingfreq(): can only set LINEAR or LOG')
+        Input:
+            spacingfreq (string): linear or log
+        Output:
+            None
+        '''
+        logging.debug(__name__ + ' : Spacing frequency is set to %s' % spacingfreq)
+        if spacingfreq.upper() in ('LINEAR'):
+            self._visainstrument.write('SWE:SPAC LIN')
+        elif spacingfreq.upper() in ('LOG'):
+            self._visainstrument.write('SWE:SPAC LOG')
+        else:
+            raise ValueError('set_spacingfreq(): can only set LINEAR or LOG')
 
     def startsweep(self):
         '''
