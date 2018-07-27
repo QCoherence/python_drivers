@@ -683,7 +683,7 @@ class MS46522B(Instrument):
             self._visainstrument.write('sens:hold:func sing')
             self._visainstrument.write('TRIG:IMM')
         else:
-            raise ValueError('set_trigger(): can only set INT, EXT, MAN, IMM'
+            raise ValueError('set_trigger(): can only set INT, EXT, MAN, IMM')
 			
     def do_set_ext_trig_type(self, ext_trigger_type='ALL'):
         '''
