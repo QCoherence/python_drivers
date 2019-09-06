@@ -2,6 +2,8 @@
 # MS46522B.py is a driver for Anritsu MS46522B Vector Network Analyser
 # written by Remy Dassonneville, 2017
 #
+# Edited to fix CW frequency bug -Arpit
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -204,11 +206,306 @@ class MS46522B(Instrument):
         self.get_ext_trig_type()
 
 
+###################################################################
+#
+#                           Initialisation
+#
+###################################################################
+
+    def initialize_one_tone_spectroscopy(self, traces, Sparams):
+
+        # Linear sweep in frequency
+        self.set_sweeptype('lin')
+
+        # Trigger to immediate
+        self.set_trigger('IMM')     # NOT DONE
+
+        # We create traces in memory
+        self.create_traces(traces, Sparams)
+
+        # No partial measurement
+        # self.set_driving_mode('chopped')  # NOT DONE
+
+
+        self.set_status('on')
+
+    def initialize_two_tone_spectroscopy(self, traces, Sparams):
+
+        # We measure all points at the same frequency
+        self.set_sweeptype('CW')
+
+        # Trigger to external since the vna will triggered by  another device
+        self.set_trigger('EXT')
+        self.set_ext_trig_type('POIN')
+
+        # We create traces in memory
+        self.create_traces(traces, Sparams)
+
+        # We clear average
+        self.averageclear()
+
+        self.set_status('on')
+        
+###################################################################
+#
+#                           Trace
+#
+###################################################################
+
+    def create_traces(self, traces, Sparams):
+        """
+            Create traces in the ZNB
+            Input:
+                - traces (tuple): Name of the traces from which we get data.
+                                  Should be a tuple of string.
+                                  ('1', '2', ...)
+                                  If only one trace write ('1',) to
+                                  have a tuple.
+                - Sparams (tuple): S parameters we want to acquire.
+                                   Should be a tuple of string.
+                                   ('Sparams', 'Sparams', ...)
+                                   If only one S parameter, write ('Sparam1',)
+                                   to have a tuple.
+
+            Output:
+                - None
+        """
+
+
+        # We check if parameters are tupples
+        if type(traces) is not tuple and type(Sparams) is not tuple:
+            raise ValueError('Traces and Sparams must be tuple type')
+
+        # We check if traces and Sparam have the same length
+        if len(traces) != len(Sparams):
+            raise ValueError('Traces and Sparams must have the same length')
+
+        # We check the type of traces elements
+        if not all([type(trace) is str for trace in traces]):
+            raise ValueError('Element in traces should be string type')
+
+        # We check the type of sparams elements
+        if not all([type(Sparam) is str for Sparam in Sparams]):
+            raise ValueError('Element in Sparams should be string type')
+
+        logging.info(__name__ + ' : create trace(s)')
+
+        # First we set the number of traces to one to start with a clean measurement channel (this number cannot be set to zero). 
+        self._visainstrument.write('calc:parameter:count 1')
+
+        # For each traces we want, we create
+        for trace, Sparam in zip(traces, Sparams):
+            self._visainstrument.write('calc:parameter%s:def %s' % (trace, Sparam))
+            if self._visainstrument.query('calc:parameter%s:def?'%trace) != Sparam:
+                print self._visainstrument.query('calc:parameter%s:def?'%trace)
+                raise ValueError(" The parameter %s was not well defined on the trace %s" %(Sparam, trace))
+
+        # We display traces on the device
+        # First we put display on
+        self._visainstrument.write('disp:wind1:act')
+
+        # Second we display all traces
+        for i, trace in enumerate(traces):
+            self._visainstrument.write('disp:wind1:trac%s' % (i + 1) ) #<- not sure if working....
+
+        # We set the update of the display on
+        # self._visainstrument.write('syst:disp:upd on') #<- not update command
+
+        # We set continuous measurement off
+        # The measurement will be stopped after the setted number of sweep
+        self._visainstrument.write('init:cont off')
+        
+
+
+    def _get_data(self, trace, data_format = 'db-phase'):
+        """
+            Return data given by the ZNB in the asked format.
+            Input:
+                - trace (string): Name of the trace from which we get data
+                - data_format (string): must be:
+                                        'real-imag', 'db-phase', 'amp-phase'
+                                        The phase is returned in rad.
+
+            Output:
+                - Following the data_format input it returns the tupples:
+                    real, imag
+                    db, phase
+                    amp, phase
+        """
+
+        # Selects an existing trace as the active trace of the channel
+        self._visainstrument.write('calc:parameter%s:sel' % (trace))
+        print self._visainstrument.query('calc:parameter:sel?')
+
+        # self._visainstrument.write('form:Data:head 0')
+        # self._visainstrument.write('calc:form REIM')
+        self._visainstrument.write('form:Data real')
+        # Get data as a string
+        # val = self._visainstrument.query('calculate:Data:Sdata?') # to be checked
+        val2 = self._visainstrument.query_binary_values('calculate:Data:Sdata?',
+                    datatype='d', is_big_endian=False, container=np.array)
+
+        # Change the shape of the array to get the real an imaginary part
+        real, imag = np.transpose(np.reshape(val2, (-1, 2)))
+
+        if data_format.lower() == 'real-imag':
+            return real, imag
+        elif data_format.lower() == 'db-phase':
+            return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
+        elif data_format.lower() == 'amp-phase':
+            return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
+        else:
+            raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
+
+    def get_traces(self, traces, data_format = 'db-phase'):# to be checked
+        """
+            Return data given by the ZNB in the asked format.
+            Input:
+                - traces (tuple): Name of the traces from which we get data.
+                                  Should be a tuple of string.
+                                  ('trace1', 'trace2', ...)
+                                  If only one trace write ('trace1',) to
+                                  have a tuple.
+                - data_format (string): must be:
+                                        'real-imag', 'db-phase', 'amp-phase'
+                                        The phase is returned in rad.
+
+
+            Output:
+                - Following the data_format input it returns the tupples:
+                    (a1, a2), (b1, b2), ...
+                    where a1, a2 are the db-phase, by default, of the trace1
+                    and b1, b2 of the trace2.
+        """
+
+        # We check if traces is tuple type
+        if type(traces) is not tuple :
+            raise ValueError('Traces must be tuple type')
+
+        # We check the type of traces elements
+        if not all([type(trace) is str for trace in traces]):
+            raise ValueError('Element in traces should be string type')
+
+        logging.info(__name__ +' : start to measure and wait till it is finished')
+
+        while self._visainstrument.query('sens:hold:func?') == 'SING': 
+            qt.msleep(0.1)
+
+        else:
+
+            temp = []
+            for trace in traces:
+                # # print 'append'
+
+                temp.append(self._get_data(trace, data_format = data_format))
+
+            return temp
+
+    def measure(self):# to be checked
+        '''
+        creates a trace to measure Sparam and displays it
+
+        Input:
+
+        Output:
+            None
+
+        '''
+        logging.info(__name__ +\
+                     ' : start to measure and wait untill it is finished')
+
+        self._visainstrument.write('initiate:cont off')
+
+        self._visainstrument.write('*CLS') # use of it?
+
+        # self._visainstrument.write('INITiate1:IMMediate; *OPC')
+        self._visainstrument.write('sens:hold:func sing')
+        # self._visainstrument.write('TRIG:IMM')
+
+
+    def averageclear(self):
+        '''
+        Starts a new average cycle
+
+
+        Input:
+            None
+
+        Output:
+            None
+        '''
+        logging.info(__name__ + ' : clear average')
+        self._visainstrument.write(':sens:aver:clear')
+
+
+    def set_trigger(self, trigger='INT'):
+        '''
+
+        Define the source of the trigger:
+
+        Input:
+            trigger (string): INT, EXT, MAN
+            trigger: IMM
+        Output:
+            None
+        '''
+
+        logging.debug(__name__ +\
+        ' : The source of the trigger is set to %s' % trigger)
+
+        if trigger.upper() in ('INT', 'EXT', 'MAN'):
+            self._visainstrument.write("TRIG:SOUR "+str(trigger.upper()))
+        elif trigger.upper() == 'IMM':
+
+            self._visainstrument.write("TRIG:SOUR INT")
+            self._visainstrument.write('sens:hold:func sing')
+            self._visainstrument.write('TRIG:IMM')
+        else:
+            raise ValueError('set_trigger(): can only set INT, EXT, MAN, IMM')
+
+
+    def do_set_ext_trig_type(self, ext_trigger_type='ALL'):
+        '''
+        The command sets the type of trigger 
+		that will be associated with the external trigger.
+
+        Input:
+            trigger_type (type): ALL, POIN
+        Output:
+            None
+        '''
+
+        logging.debug(__name__ +\
+                      ' : The mode of external trigger is ')
+
+        if ext_trigger_type.upper() in ('ALL', 'POIN'):
+            self._visainstrument.write("TRIG:EXT:TYP "+str(ext_trigger_type.upper()))
+
+        else:
+            raise ValueError('set_ext_trig_type(): must be ALL or POIN')
+
+    def do_get_ext_trig_type(self):
+        '''
+        The command gets the type of trigger 
+		that will be associated with the external trigger.
+
+        Input:
+            None
+        Output:
+            ALL or POIN
+        '''
+
+        logging.debug(__name__ +\
+                      ' : Gets the mode of external trigger')
+
+        return self._visainstrument.query("TRIG:EXT:TYP? ")
+        
 ################################################################################
 #
 #               parameters
 #
 ################################################################################
+
     def do_get_averagestatus(self):
         """
         Reads the average status from the instrument
@@ -439,6 +736,7 @@ class MS46522B(Instrument):
         '''
 
         logging.info(__name__+' : Set the CW frequency of the instrument')
+        self._visainstrument.write('SENS:frequency:center '+str(cwfrequency))#trick to set correct CW frequency -Arpit
         self._visainstrument.write('SENS:FREQ:CW '+str(cwfrequency))
 
     def do_get_cwfrequency(self):
@@ -643,286 +941,3 @@ class MS46522B(Instrument):
 
 
         return self._visainstrument.query('SENS:SWE:CW:POIN?')
-
-##########################################################
-    def averageclear(self):
-        '''
-        Starts a new average cycle
-
-
-        Input:
-            None
-
-        Output:
-            None
-        '''
-        logging.info(__name__ + ' : clear average')
-        self._visainstrument.write(':sens:aver:clear')
-
-##########################################################
-    def set_trigger(self, trigger='INT'):
-        '''
-
-        Define the source of the trigger:
-
-        Input:
-            trigger (string): INT, EXT, MAN
-            trigger: IMM
-        Output:
-            None
-        '''
-
-        logging.debug(__name__ +\
-        ' : The source of the trigger is set to %s' % trigger)
-
-        if trigger.upper() in ('INT', 'EXT', 'MAN'):
-            self._visainstrument.write("TRIG:SOUR "+str(trigger.upper()))
-        elif trigger.upper() == 'IMM':
-
-            self._visainstrument.write("TRIG:SOUR INT")
-            self._visainstrument.write('sens:hold:func sing')
-            self._visainstrument.write('TRIG:IMM')
-        else:
-            raise ValueError('set_trigger(): can only set INT, EXT, MAN, IMM'
-			
-    def do_set_ext_trig_type(self, ext_trigger_type='ALL'):
-        '''
-        The command sets the type of trigger 
-		that will be associated with the external trigger.
-
-        Input:
-            trigger_type (type): ALL, POIN
-        Output:
-            None
-        '''
-
-        logging.debug(__name__ +\
-                      ' : The mode of external trigger is ')
-
-        if ext_trigger_type.upper() in ('ALL', 'POIN'):
-            self._visainstrument.write("TRIG:EXT:TYP "+str(ext_trigger_type.upper()))
-
-        else:
-            raise ValueError('set_ext_trig_type(): must be ALL or POIN')
-
-    def do_get_ext_trig_type(self):
-        '''
-        The command gets the type of trigger 
-		that will be associated with the external trigger.
-
-        Input:
-            None
-        Output:
-            ALL or POIN
-        '''
-
-        logging.debug(__name__ +\
-                      ' : Gets the mode of external trigger')
-
-        return self._visainstrument.query("TRIG:EXT:TYP? ")
-
-##########################################################
-    def create_traces(self, traces, Sparams):
-        """
-            Create traces in the ZNB
-            Input:
-                - traces (tuple): Name of the traces from which we get data.
-                                  Should be a tuple of string.
-                                  ('1', '2', ...)
-                                  If only one trace write ('1',) to
-                                  have a tuple.
-                - Sparams (tuple): S parameters we want to acquire.
-                                   Should be a tuple of string.
-                                   ('Sparams', 'Sparams', ...)
-                                   If only one S parameter, write ('Sparam1',)
-                                   to have a tuple.
-
-            Output:
-                - None
-        """
-
-
-        # We check if parameters are tupples
-        if type(traces) is not tuple and type(Sparams) is not tuple:
-            raise ValueError('Traces and Sparams must be tuple type')
-
-        # We check if traces and Sparam have the same length
-        if len(traces) != len(Sparams):
-            raise ValueError('Traces and Sparams must have the same length')
-
-        # We check the type of traces elements
-        if not all([type(trace) is str for trace in traces]):
-            raise ValueError('Element in traces should be string type')
-
-        # We check the type of sparams elements
-        if not all([type(Sparam) is str for Sparam in Sparams]):
-            raise ValueError('Element in Sparams should be string type')
-
-        logging.info(__name__ + ' : create trace(s)')
-
-        # First we erase memory
-        self._visainstrument.write('calc:parameter:del:all')
-
-        # For each traces we want, we create
-        for trace, Sparam in zip(traces, Sparams):
-            self._visainstrument.write('calc:parameter%s:def %s' % (trace, Sparam))
-            if self._visainstrument.query('calc:parameter%s:def?'%trace) != Sparam:
-                print self._visainstrument.query('calc:parameter%s:def?'%trace)
-                raise ValueError(" The parameter %s was not well defined on the trace %s" %(Sparam, trace))
-
-        # We display traces on the device
-        # First we put display on
-        self._visainstrument.write('disp:wind1:act')
-
-        # Second we display all traces
-        for i, trace in enumerate(traces):
-            self._visainstrument.write('disp:wind1:trac%s' % (i + 1) ) #<- not sure if working....
-
-        # We set the update of the display on
-        # self._visainstrument.write('syst:disp:upd on') #<- not update command
-
-        # We set continuous measurement off
-        # The measurement will be stopped after the setted number of sweep
-        self._visainstrument.write('init:cont off')
-
-##########################################################
-    def initialize_one_tone_spectroscopy(self, traces, Sparams):
-
-        # Linear sweep in frequency
-        self.set_sweeptype('lin')
-
-        # Trigger to immediate
-        self.set_trigger('IMM')     # NOT DONE
-
-        # We create traces in memory
-        self.create_traces(traces, Sparams)
-
-        # No partial measurement
-        # self.set_driving_mode('chopped')  # NOT DONE
-
-
-        self.set_status('on')
-
-    def initialize_two_tone_spectroscopy(self, traces, Sparams):
-
-        # We measure all points at the same frequency
-        self.set_sweeptype('CW')
-
-        # Trigger to external since the vna will triggered by  another device
-        self.set_trigger('EXT')
-        self.set_ext_trig_type('POIN')
-
-        # We create traces in memory
-        self.create_traces(traces, Sparams)
-
-        # We clear average
-        self.averageclear()
-
-        self.set_status('on')
-
-##########################################################
-    def get_data(self, trace, data_format = 'db-phase'):
-        """
-            Return data given by the ZNB in the asked format.
-            Input:
-                - trace (string): Name of the trace from which we get data
-                - data_format (string): must be:
-                                        'real-imag', 'db-phase', 'amp-phase'
-                                        The phase is returned in rad.
-
-            Output:
-                - Following the data_format input it returns the tupples:
-                    real, imag
-                    db, phase
-                    amp, phase
-        """
-
-        # Selects an existing trace as the active trace of the channel
-        self._visainstrument.write('calc:parameter%s:sel' % (trace))
-        print self._visainstrument.query('calc:parameter:sel?')
-
-        # self._visainstrument.write('form:Data:head 0')
-        # self._visainstrument.write('calc:form REIM')
-        self._visainstrument.write('form:Data real')
-        # Get data as a string
-        # val = self._visainstrument.query('calculate:Data:Sdata?') # to be checked
-        val2 = self._visainstrument.query_binary_values('calculate:Data:Sdata?',
-                    datatype='d', is_big_endian=False, container=np.array)
-
-        # Change the shape of the array to get the real an imaginary part
-        real, imag = np.transpose(np.reshape(val2, (-1, 2)))
-
-        if data_format.lower() == 'real-imag':
-            return real, imag
-        elif data_format.lower() == 'db-phase':
-            return 20.*np.log10(abs(real + 1j*imag)), np.angle(real + 1j*imag)
-        elif data_format.lower() == 'amp-phase':
-            return abs(real + 1j*imag)**2., np.angle(real + 1j*imag)
-        else:
-            raise ValueError("data-format must be: 'real-imag', 'db-phase', 'amp-phase'.")
-
-    def get_traces(self, traces, data_format = 'db-phase'):# to be checked
-        """
-            Return data given by the ZNB in the asked format.
-            Input:
-                - traces (tuple): Name of the traces from which we get data.
-                                  Should be a tuple of string.
-                                  ('trace1', 'trace2', ...)
-                                  If only one trace write ('trace1',) to
-                                  have a tuple.
-                - data_format (string): must be:
-                                        'real-imag', 'db-phase', 'amp-phase'
-                                        The phase is returned in rad.
-
-
-            Output:
-                - Following the data_format input it returns the tupples:
-                    (a1, a2), (b1, b2), ...
-                    where a1, a2 are the db-phase, by default, of the trace1
-                    and b1, b2 of the trace2.
-        """
-
-        # We check if traces is tuple type
-        if type(traces) is not tuple :
-            raise ValueError('Traces must be tuple type')
-
-        # We check the type of traces elements
-        if not all([type(trace) is str for trace in traces]):
-            raise ValueError('Element in traces should be string type')
-
-        logging.info(__name__ +' : start to measure and wait till it is finished')
-
-        while self._visainstrument.query('sens:hold:func?') == 'SING': #self._visainstrument.query('*ESR?') != '1':
-            qt.msleep(0.1)
-            # print 'wait for the end of the sweep measurement'
-
-        else:
-
-            temp = []
-            for trace in traces:
-                # # print 'append'
-
-                temp.append(self.get_data(trace, data_format = data_format))
-
-            return temp
-
-    def measure(self):# to be checked
-        '''
-        creates a trace to measure Sparam and displays it
-
-        Input:
-
-        Output:
-            None
-
-        '''
-        logging.info(__name__ +\
-                     ' : start to measure and wait untill it is finished')
-
-        self._visainstrument.write('initiate:cont off')
-
-        self._visainstrument.write('*CLS') # use of it?
-
-        # self._visainstrument.write('INITiate1:IMMediate; *OPC')
-        self._visainstrument.write('sens:hold:func sing')
-        # self._visainstrument.write('TRIG:IMM')

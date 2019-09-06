@@ -69,7 +69,7 @@ class iMACRT(Instrument):
             # self.add_parameter('Resistance',type=types.FloatType,flags=Instrument.FLAG_GET,units='Ω')
             self._param_period = 3
             
-            self._param_dict = {'R':1,'T':2}
+            self._param_dict = {'R':1,'T':2, 'setpoint':4, 'CH_I':5}
             
         elif self._type == 'MGC':
             # This driver version is not using get/set wrapper for these parameters yet 
@@ -84,7 +84,7 @@ class iMACRT(Instrument):
             # self.add_parameter('mmr3_Channel',type=types.IntType,flags=Instrument.FLAG_GETSET)
 
             self._param_period = 12
-            self._param_dict = {'ON':1,'setpoint':2,'P':4,'I':5,'D':6,'Pmax':7,'R':8,'name':11,'ch':12}
+            self._param_dict = {'ON':1,'setpoint':2,'P':4,'I':5,'D':6,'Pmax':7,'R':8,'name':'a','ch':'b','R_mode':'f'}
             
 
         elif self._type == 'iMA':
@@ -150,12 +150,10 @@ class iMACRT(Instrument):
 
     def get_param(self,k):
         message = 'MACRTGET %s' % (k)
-        print message 
         return self._send(message,recv = True)
     
     def set_param(self,k,val): 
         message = 'MACRTSET %s %f' % (k,val)
-        print message 
         return self._send(message,recv = True)
     
 
@@ -166,11 +164,10 @@ class iMACRT(Instrument):
         if param not in self._param_dict:
             return 'parameter not defined'
         if self._type == 'MMR' : 
-            message = 'MACRTGET %d' % int(3*self._param_dict[param]+ch)
+            message = 'MACRTGET ' + str(int(3*self._param_dict[param]+ch))
             return self._send(message, recv=True)
         elif self._type == 'MGC' : 
-            message = 'MACRTGET 0x%d0%d' % (ch+1,self._param_dict[param])
-            print message
+            message = 'MACRTGET 0x'+str(ch+1) +'0'+str(self._param_dict[param])
             return self._send(message, recv=True).replace(message,'')
         
 # --- set parameters depending the the type 
@@ -179,10 +176,9 @@ class iMACRT(Instrument):
         if param not in self._param_dict:
             return 'parameter not defined'
         if self._type == 'MMR' : 
-            message = 'MACRTSET %d %s' % (3*self._param_dict[param]+ch,val)
+            message = 'MACRTSET ' + str(3*self._param_dict[param]+ch)+' '+str(val)
         elif self._type == 'MGC' : 
-            message = 'MACRTSET 0x%d0%d %s' % (ch+1,self._param_dict[param],val)
-            print message
+            message = 'MACRTSET 0x' +str(ch+1)+'0'+str(self._param_dict[param]) +' '+str(val)
         return self._send(message, recv=True)
 
 ###
@@ -216,8 +212,10 @@ class iMACRT(Instrument):
             # self._interrogation = True
             # self.get('ch%d_Temperature'%(channel))
             # self._interrogation = False
+        
         return float(self.interrogate(channel,'T'))
-
+              
+              
     def get_Resistance(self, channel):
         # if not self._interrogation:
             # self._interrogation = True
@@ -247,10 +245,18 @@ class iMACRT(Instrument):
         return float(self.interrogate(channel,'Pmax'))
     # def get_Resistance(self, channel):
         # return float(self.interrogate(channel,'R'))
-    def get_mmr3_Unit(self, channel):
-        return self.interrogate(channel,'name')
-    def get_mmr3_Channel(self, channel):
-        return int(float(self.interrogate(channel,'ch')))+1
+        
+# Not working for unknown reason 
+
+    # def get_mmr3_Name(self, channel):
+        # return self.interrogate(channel,'name')
+    # def get_mmr3_Channel(self, channel):
+        # return self.interrogate(channel,'ch')
+    def get_reg_mode(self,channel):
+        return int(float(self.interrogate(channel,'R_mode')))
+        
+        
+        
     def set_on(self,channel,val):
         self.submit(channel,'ON',int(val))
     def set_setpoint(self,channel,val):
@@ -265,7 +271,14 @@ class iMACRT(Instrument):
         self.submit(channel,'Pmax',val)
     def set_Resistance(self,channel,val):
         self.submit(channel,'R',val)
-    def set_mmr3_Unit(self,channel,val):
-        self.submit(channel,'name','"'+val[:13]+'"')
-    def set_mmr3_Channel(self,channel,val):
-        self.submit(channel,'ch',val-1)
+        
+    def set_reg_mode(self,channel,val):
+        self.submit(channel,'R_mode',val)
+    
+        
+# Not working for unknown reason 
+
+    # def set_mmr3_Name(self,channel,val):
+        # self.submit(channel,'name','"'+val+'"')
+    # def set_mmr3_Channel(self,channel,val):
+        # self.submit(channel,'ch',val-1)

@@ -54,7 +54,7 @@ class SMB100A(Instrument):
             raise SystemExit
 
 
-        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=100e3, maxval=20e9, type=types.FloatType)
+        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='GHz', minval=100e-6, maxval=20, type=types.FloatType)
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval=-145, maxval=30.0, type=types.FloatType)
         self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-pi, maxval=pi, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
@@ -122,14 +122,14 @@ class SMB100A(Instrument):
             Set the frequency of the instrument
 
             Input:
-                frequency (float): Frequency at which the instrument will be tuned [Hz]
+                frequency (float): Frequency at which the instrument will be tuned [GHz]
 
             Output:
                 None
         '''
 
         logging.info(__name__+' : Set the frequency of the intrument')
-        self._visainstrument.write('frequency '+str(frequency))
+        self._visainstrument.write('frequency '+str(frequency)+ 'GHz')
 
 
     def do_get_frequency(self):
@@ -140,11 +140,11 @@ class SMB100A(Instrument):
                 None
 
             Output:
-                frequency (float): frequency at which the instrument has been tuned [Hz]
+                frequency (float): frequency at which the instrument has been tuned [GHz]
         '''
 
         logging.info(__name__+' : Get the frequency of the intrument')
-        return self._visainstrument.query('frequency?')
+        return float(self._visainstrument.query('frequency?'))*1e-9
 
 #########################################################
 #
