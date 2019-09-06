@@ -158,6 +158,48 @@ class ZNB20(Instrument):
                            option_list = ['Auto', 'Alternated', 'Chopped'],
                            type        = types.StringType)
 
+        self.add_parameter('delay_time_p1',
+                           flags       = Instrument.FLAG_GETSET,
+                           units       = 's',
+                           minval      = -3.336,
+                           maxval      = 3.336,
+                           type        = types.FloatType)
+
+        # self.add_parameter('delay_length_mech_p1',
+        #                    flags       = Instrument.FLAG_GETSET,
+        #                    units       = 'm',
+        #                    minval      = -3.4e38,
+        #                    maxval      = 3.4e38,
+        #                    type        = types.FloatType)
+
+        # self.add_parameter('delay_length_ele_p1',
+        #                    flags       = Instrument.FLAG_GETSET,
+        #                    units       = 'm',
+        #                    minval      = -1e9,
+        #                    maxval      = 1e9,
+        #                    type        = types.FloatType)
+
+        self.add_parameter('delay_time_p2',
+                           flags       = Instrument.FLAG_GETSET,
+                           units       = 's',
+                           minval      = -3.336,
+                           maxval      = 3.336,
+                           type        = types.FloatType)
+
+        # self.add_parameter('delay_length_mech_p2',
+        #                    flags       = Instrument.FLAG_GETSET,
+        #                    units       = 'm',
+        #                    minval      = -3.4e38,
+        #                    maxval      = 3.4e38,
+        #                    type        = types.FloatType)
+
+        # self.add_parameter('delay_length_ele_p2',
+        #                    flags       = Instrument.FLAG_GETSET,
+        #                    units       = 'm',
+        #                    minval      = -1e9,
+        #                    maxval      = 1e9,
+        #                    type        = types.FloatType)
+
 
 
         self.add_function('get_all')
@@ -214,6 +256,12 @@ class ZNB20(Instrument):
         self.get_status()
         self.get_cwfrequency()
         self.get_driving_mode()
+        self.get_delay_time_p1()
+        # self.get_delay_length_mech_p1()
+        # self.get_delay_length_ele_p1()
+        self.get_delay_time_p2()
+        # self.get_delay_length_mech_p2()
+        # self.get_delay_length_ele_p2()
 
 
 
@@ -272,6 +320,7 @@ class ZNB20(Instrument):
         self.set_driving_mode('chopped')
 
         self.set_status('on')
+        
 ###################################################################
 #
 #                           Trace
@@ -1247,3 +1296,77 @@ class ZNB20(Instrument):
             self._visainstrument.write('COUP ALL')
         else:
             raise ValueError("The mode must be 'auto', 'alternated' or 'chopped'")
+
+
+
+
+#####################################################################################
+#
+#                Delay / Electrical Length / Mechanical Length
+#
+#####################################################################################
+
+
+    def do_set_delay_time_p1(self, time = 0):
+        '''
+            Set the time delay for port 1 (manual page 735)
+
+
+            Input:
+                time (float): time delay for port 1
+                               [s]
+
+            Output:
+                None
+        '''
+
+        logging.info(__name__+' : Set the time delay for port 1')
+        self._visainstrument.write('sens:corr:edel1:time '+str(time))
+
+
+    def do_get_delay_time_p1(self):
+        '''
+            Get the time delay for port 1 (manual page 735)
+
+            Input:
+                None
+
+            Output:
+
+                time (float): time delay for port 1 [s]
+        '''
+
+        logging.info(__name__+' : Get the time delay for port 1')
+        return self._visainstrument.query('sens:corr:edel1:time?')
+
+    def do_set_delay_time_p2(self, time = 0):
+        '''
+            Set the time delay for port 2 (manual page 735)
+
+
+            Input:
+                time (float): time delay for port 2
+                               [s]
+
+            Output:
+                None
+        '''
+
+        logging.info(__name__+' : Set the time delay for port 2')
+        self._visainstrument.write('sens:corr:edel2:time '+str(time))
+
+
+    def do_get_delay_time_p2(self):
+        '''
+            Get the time delay for port 2 (manual page 735)
+
+            Input:
+                None
+
+            Output:
+
+                time (float): time delay for port 2 [s]
+        '''
+
+        logging.info(__name__+' : Get the time delay for port 2')
+        return self._visainstrument.query('sens:corr:edel2:time?')

@@ -53,7 +53,7 @@ class Agilent_E8257D_40GHz(Instrument):
 
         self.add_parameter('power', flags=Instrument.FLAG_GETSET, units='dBm', minval=-135, maxval=25, type=types.FloatType)
         self.add_parameter('phase', flags=Instrument.FLAG_GETSET, units='rad', minval=-numpy.pi, maxval=numpy.pi, type=types.FloatType)
-        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=1e5, maxval=40e9, type=types.FloatType)
+        self.add_parameter('frequency', flags=Instrument.FLAG_GETSET, units='Hz', minval=1, maxval=40, type=types.FloatType)
         self.add_parameter('status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('pulse_status', flags=Instrument.FLAG_GETSET, option_list=['on', 'off'], type=types.StringType)
         self.add_parameter('pulse_type', flags=Instrument.FLAG_GETSET, option_list=['square', 'frun', 'trigered', 'doublet', 'gated'], type=types.StringType)
@@ -166,23 +166,23 @@ class Agilent_E8257D_40GHz(Instrument):
             None
 
         Output:
-            freq (float) : Frequency in Hz
+            freq (float) : Frequency in GHz
         '''
         logging.debug(__name__ + ' : get frequency')
-        return float(self._visainstrument.query('FREQ:CW?'))
+        return float(self._visainstrument.query('FREQ:CW?'))/1e9
 
     def do_set_frequency(self, freq):
         '''
         Set the frequency of the instrument
 
         Input:
-            freq (float) : Frequency in Hz
+            freq (float) : Frequency in GHz
 
         Output:
             None
         '''
-        logging.debug(__name__ + ' : set frequency to %f' % freq)
-        self._visainstrument.write('FREQ:CW %s' % freq)
+        logging.debug(__name__ + ' : set frequency to %f GHz' % freq)
+        self._visainstrument.write('FREQ:CW %s GHz' % freq)
 
     def do_get_status(self):
         '''
@@ -466,6 +466,15 @@ class Agilent_E8257D_40GHz(Instrument):
             self._visainstrument.write('SWEep:GENeration STEPped')
             self._visainstrument.write('TRIGger:SOURce IMMediate')
             self._visainstrument.write('INITiate:CONTinuous ON')
+        elif sweepmode.upper() in ('STEP'): 
+        # TO BE CHECKED
+            self._visainstrument.write('SWE:MODE AUTO')
+            self._visainstrument.write('SWEep:GENeration STEPped')
+            # self._visainstrument.write('POINt:TRIG:FSW:SOUR EXT')
+            self._visainstrument.write('TRIGger:SOURce EXTernal')
+            # self._visainstrument.write('INITiate:CONTinuous ON')
+
+            
         else:
             raise ValueError('set_sweepmode(): can only set AUTO or SINGLE')
 
@@ -547,7 +556,7 @@ class Agilent_E8257D_40GHz(Instrument):
         logging.debug(__name__ + ' : Step frequency is set to %s' % stepfreq)
         self._visainstrument.write('FREQ:STEP '+str(float(stepfreq))+'GHz')
 
-    def set_points(self,points):
+    def set_pointsfreq(self,points):
         '''
     	Define the number of points of the sweep in linear spacing mode.
 
@@ -558,3 +567,14 @@ class Agilent_E8257D_40GHz(Instrument):
         '''
         logging.debug(__name__ + ' : Sweep number of points is set to %s' % points)
         self._visainstrument.write('SWEep:POINts '+str(int(points)))
+
+
+    def set_gui_update(self,status): 
+        ''' 
+        Switch on or off the updating of the screen 
+        
+        Input: status (str) : 'ON' or 'OFF'
+        '''
+        logging.debug(__name__+ ' : Switch ' + str(status) + ' the screen')
+        self._visainstrument.write('DISPlay:REMote '+ str(status))
+    
