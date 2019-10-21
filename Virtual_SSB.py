@@ -62,7 +62,7 @@ class Virtual_SSB(Instrument):
 
         self.add_parameter('band_type',
                             flags=Instrument.FLAG_GETSET,
-                            option_list= [-1, +1],
+                            option_list= [-1,0, +1],
                             type=types.FloatType)
 
         self.add_parameter('LO_power',
