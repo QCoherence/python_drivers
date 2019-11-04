@@ -140,7 +140,7 @@ class VI_rp(Instrument):
         self.set_period(1)
         self._period_min = 100e-6
         self._security_time = 100e-9
-        self._nb_point_avg = 40000
+        self._nb_point_avg = 10000
 
         if mwsrc_qubit != 'None':
             self._microwave_generator1.set_freqsweep('off')
@@ -486,9 +486,11 @@ class VI_rp(Instrument):
     def IQ_noise(self,freq_ro, nb_points, power_mw, channel): 
     
         '''
-            Do a I,Q measurement using the Redpitaya and one microwave source
+            Do a I,Q measurement using the Redpitaya and one microwave source. 
+            It can be used to characterize the noise of the measurement line
             Input:
-                - freq_vec(float): vector of frequency to be played by the microwave source in GHz
+                - freq_ro(float): frequency to be played by the microwave source in GHz
+                - nb_points(int): number of points to be taken 
                 - power_mw(float): power of the microwave source in dB
                 - channel(string): channel of the redpitaya used to generate signal and reading out.
                   It should be 'CH1' of 'CH2'.
@@ -546,9 +548,12 @@ class VI_rp(Instrument):
 
         return I, Q
             
-    def two_tones_rabi(self,freq_vec,freq_ro, power_ro, power_ex, t_ex = 1e-6,amp_ex = 0.5, channel_ro = 'CH1'):
+    def two_tones_rabi(self,freq_vec,freq_ro, power_ro, power_ex, t_ex = 1e-6,amp_ex = 0.2, channel_ro='CH1'):
         '''
-            Do a twotone measurement using the redpitaya and two microwave sources. 
+            Do a twotone measurement using the redpitaya and two microwave sources.
+            Carefull this is using a rabi-like sequence, the readout and the excitation
+            are not simultaneous. 
+            This can be usefull combined with one_tone to measure dispersive shift.
             Input:
                 - freq_vec (float)    : vector of frequency to be played by the excitation source in GHz
                 - freq_ro (float)     : readout frequency to be played by the readout source in GHz
@@ -646,7 +651,7 @@ class VI_rp(Instrument):
 
         return I, Q
         
-    def two_tones(self,freq_vec,freq_ro, power_ro, power_ex, t_ro = 60e-6, t_ex = 60e-6, amp_ex = 0.5, channel_ro = 'CH1'):
+    def two_tones(self,freq_vec,freq_ro, power_ro, power_ex, t_ro = 60e-6, t_ex = 60e-6, amp_ex = 0.2, channel_ro = 'CH1'):
         '''
             Do a twotone measurement using the redpitaya and two microwave sources. 
             Input:
@@ -680,8 +685,8 @@ class VI_rp(Instrument):
         table_sin_ro = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, self._ro_pulse_amplitude,
                                                        t_ro, 0])
         """!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
-        table_sin_ro = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, self._ro_pulse_amplitude,
-                                                       t_ro, t_ex])
+        # table_sin_ro = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, self._ro_pulse_amplitude,
+        #                                                t_ro, t_ex])
         """!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
                                                        
         table_sin_IQ = self._redpitaya.fill_LUT('SIN', [self._ro_pulse_frequency, 1,t_ro,0])
@@ -693,7 +698,7 @@ class VI_rp(Instrument):
         # --- set the period and the ADC/DAC parameters 
         time_step = max(t_ex, t_ro)
         """!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
-        time_step = t_ex+t_ro
+        # time_step = t_ex+t_ro
         period = self._period_min + time_step
         """!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
         self.set_period(period)
@@ -701,8 +706,8 @@ class VI_rp(Instrument):
         self._redpitaya.set_start_ADC(self._ro_pulse_delay)
         self._redpitaya.set_stop_ADC(t_ro + self._ro_pulse_delay)
         """!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
-        self._redpitaya.set_start_ADC(self._ro_pulse_delay+t_ex)
-        self._redpitaya.set_stop_ADC(time_step + self._ro_pulse_delay)
+        # self._redpitaya.set_start_ADC(self._ro_pulse_delay+t_ex)
+        # self._redpitaya.set_stop_ADC(time_step + self._ro_pulse_delay)
         """!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
 
         
@@ -746,15 +751,15 @@ class VI_rp(Instrument):
 
         return I, Q
 
-    def relaxation(self, freq_ex, freq_ro, power_ex, power_ro, t_wait, t_ex, amp_ex = 0.5, channel_ro = 'CH1'):
+    def relaxation(self, freq_ex, freq_ro, power_ex, power_ro, t_wait, t_ex, amp_ex, channel_ro='CH1'):
 
         '''
             Do a relaxation measurement using the redpitaya and two microwave sources. 
             Input:
                 - freq_ex (float)     : excitation frequency to be played by the excitation source in GHz
                 - freq_ro (float)     : readout frequency to be played by the readout source in GHz
-                - power_ro (float)    : power of the readout source in dB 
                 - power_ex (float)    : power of the excitation source in dB
+                - power_ro (float)    : power of the readout source in dB 
                 - t_wait (float)      : time to wait between the excitation and the readout in second
                 - t_ex (float)        : duration of the excitation in second, if 0 one do not use the SSB
                   for the excitation but directly the microwave source 
@@ -831,14 +836,14 @@ class VI_rp(Instrument):
 
         return np.array([I]), np.array([Q])
 
-    def rabi(self,freq_ex,freq_ro, power_ex, power_ro, t_ex, amp_ex, channel_ro = 'CH1', ADC=False):
+    def rabi(self,freq_ex,freq_ro, power_ex, power_ro, t_ex, amp_ex, channel_ro='CH1', ADC=False):
         '''
             Do a rabi measurement using the redpitaya and two microwave sources. 
             Input:
                 - freq_ex (float)    : vector of frequency to be played by the excitation source in GHz
                 - freq_ro (float)     : readout frequency to be played by the readout source in GHz
-                - power_ro (float)    : power of the readout source in dB 
                 - power_ex (float)    : power of the excitation source in dB
+                - power_ro (float)    : power of the readout source in dB 
                 - t_ex (float)        : duration of the excitation in second, if 0 one do not use the SSB
                   for the excitation but directly the microwave source 
                 - amp_ex (float)      : amplitude of excitation played by the redpitaya in volt 
@@ -926,105 +931,15 @@ class VI_rp(Instrument):
             return CH1, CH2
         else: 
             return np.array([I]), np.array([Q])
-
-    def dispersive_shift(self,freq_ex,freq_vec_ro, power_ex, power_ro, t_ex, amp_ex, channel_ro = 'CH1'):
-        '''
-            Do a rabi measurement using the redpitaya and two microwave sources. 
-            Input:
-                - freq_ex (float)         : vector of frequency to be played by the excitation source in GHz
-                - freq_vec_ro (float)     : readout frequency to be played by the readout source in GHz
-                - power_ro (float)        : power of the readout source in dB 
-                - power_ex (float)        : power of the excitation source in dB
-                - t_ex (float)            : duration of the excitation in second, if 0 one do not use the SSB
-                  for the excitation but directly the microwave source 
-                - amp_ex (float)          : amplitude of excitation played by the redpitaya in volt 
-                - channel_ro (string)     : channel of the redpitaya used to generate signal and reading out.
-            Output : 
-            - I (float) : vector of I quadrature
-            - Q (float) : vector of Q quadrature
-        '''
-
-        # --- preparation of the microwave source 
-        self._microwave_generator1.set_gui_update('on')
-        self._microwave_generator2.set_gui_update('on')
         
-        self._microwave_generator1.set_freqsweep('off')
-        self._microwave_generator2.set_freqsweep('off')
-        
-        self.set_src2_cw_frequency(freq_ex)
-        
-        self._microwave_generator1.set_power(power_ro)
-        self._microwave_generator2.set_power(power_ex)
-        
-        self._microwave_generator1.set_gui_update('off')
-        self._microwave_generator2.set_gui_update('off')
-        
-        """ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
-        # --- generate the LUT 
-        table_sin_ro = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, self._ro_pulse_amplitude,
-                                                       self._ro_pulse_duration, t_ex])
-                                                       
-        table_sin_IQ = self._redpitaya.fill_LUT('SIN', [self._ro_pulse_frequency, 1,
-                                                       self._ro_pulse_duration,0])
-        table_cos_IQ = self._redpitaya.fill_LUT('COS', [self._ro_pulse_frequency, 1,
-                                                        self._ro_pulse_duration,0])
-                                                        
-        table_sin_ex = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, amp_ex, t_ex, 0])
-        
-        
-        
-        # --- set the period and the ADC/DAC parameters 
-        time_step = t_ex + self._ro_pulse_duration 
-
-        period = self._period_min + time_step
-        self.set_period(period)
-        self._redpitaya.set_stop_DAC(time_step)
-
-        """ !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"""
-        self._redpitaya.set_start_ADC(t_ex + self._ro_pulse_delay)
-        self._redpitaya.set_stop_ADC(time_step + self._ro_pulse_delay)
-        
-        # --- reset and fill the LUT()
-        self._redpitaya.reset_LUT()
-        self._redpitaya.send_DAC_LUT(table_sin_ro, channel_ro)
-
-        if channel_ro == 'CH1': 
-            self._redpitaya.send_DAC_LUT(table_sin_ex, 'CH2')
-        elif channel_ro == 'CH2': 
-            self._redpitaya.send_DAC_LUT(table_sin_ex, 'CH1')
-            
-        self._redpitaya.send_IQ_LUT(table_cos_IQ, channel_ro, quadrature='I')
-        self._redpitaya.send_IQ_LUT(table_sin_IQ, channel_ro, quadrature='Q')
-        
-        I = np.zeros(len(freq_vec_ro))
-        Q = np.zeros(len(freq_vec_ro))
-        
-        # --- take the data for the frequency vector 
-        for k in xrange(len(freq_vec_ro)):
-        
-            self.set_src1_cw_frequency(freq_vec_ro[k])
-            data = self._redpitaya.get_data(mode='IQINT', nb_measure=self._nb_point_avg)
-
-            if channel_ro == 'CH1': 
-                I[k] = np.mean(data[0])/(self._ro_pulse_duration/8e-9)
-                Q[k] = np.mean(data[1])/(self._ro_pulse_duration/8e-9)
-            elif channel_ro == 'CH2': 
-                I[k] = np.mean(data[2])/(self._ro_pulse_duration/8e-9)
-                Q[k] = np.mean(data[3])/(self._ro_pulse_duration/8e-9)
-            else: 
-                raise ValueError('For one tone the option are CH1 or CH2')
-
-                
-        return I, Q
-        
-    def ramsey(self,freq_ex,freq_ro, power_ex, power_ro, t_wait, t_ex, amp_ex, channel_ro = 'CH1'):
+    def ramsey(self,freq_ex,freq_ro, power_ex, power_ro, t_wait, t_ex, amp_ex, channel_ro='CH1'):
         '''
             Do a ramsey measurement using the redpitaya and two microwave sources. 
             Input:
                 - freq_ex (float)    : vector of frequency to be played by the excitation source in GHz
                 - freq_ro (float)     : readout frequency to be played by the readout source in GHz
-                - power_ro (float)    : power of the readout source in dB 
                 - power_ex (float)    : power of the excitation source in dB
+                - power_ro (float)    : power of the readout source in dB
                 - t_wait (float)      : time to wait between the two excitations in second
                 - t_ex (float)        : duration of the excitation in second, if 0 one do not use the SSB
                   for the excitation but directly the microwave source 
@@ -1053,7 +968,7 @@ class VI_rp(Instrument):
         
         # --- generate the LUT 
         table_sin_ro = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, self._ro_pulse_amplitude,
-                                                       self._ro_pulse_duration, t_ex])
+                                                       self._ro_pulse_duration, 2 * t_ex + t_wait])
                                                        
         table_sin_IQ = self._redpitaya.fill_LUT('SIN', [self._ro_pulse_frequency, 1,
                                                        self._ro_pulse_duration,0])
@@ -1063,8 +978,8 @@ class VI_rp(Instrument):
                                                         
         # --- set the period and the ADC/DAC parameters 
         time_step = 2*t_ex + t_wait + self._ro_pulse_duration 
-        period = max(self._period_min, time_step)
-        self.set_period(period + self._ro_pulse_delay)
+        period = self._period_min + time_step
+        self.set_period(period)
         self._redpitaya.set_stop_DAC(time_step)
         self._redpitaya.set_start_ADC(2*t_ex + t_wait + self._ro_pulse_delay)
         self._redpitaya.set_stop_ADC(time_step + self._ro_pulse_delay)
@@ -1081,35 +996,31 @@ class VI_rp(Instrument):
         self._redpitaya.send_IQ_LUT(table_cos_IQ, channel_ro, quadrature='I')
         self._redpitaya.send_IQ_LUT(table_sin_IQ, channel_ro, quadrature='Q')
         
-
-        I = np.zeros(len(freq_vec))
-        Q = np.zeros(len(freq_vec))
-        
         # --- take the data for the frequency vector 
 
         data = self._redpitaya.get_data(mode='IQINT', nb_measure=self._nb_point_avg)
         
         if channel_ro == 'CH1': 
-            I[k] = np.mean(data[0])/(time_step/8e-9)
-            Q[k] = np.mean(data[1])/(time_step/8e-9)
+            I= np.mean(data[0])/(self._ro_pulse_duration/8e-9)
+            Q = np.mean(data[1])/(self._ro_pulse_duration/8e-9)
         
         elif channel_ro == 'CH2': 
-            I[k] = np.mean(data[2])/(time_step/8e-9)
-            Q[k] = np.mean(data[3])/(time_step/8e-9)
+            I = np.mean(data[2])/(self._ro_pulse_duration/8e-9)
+            Q = np.mean(data[3])/(self._ro_pulse_duration/8e-9)
         
         else: 
             raise ValueError('For one tone the option are CH1 or CH2')
 
-        return I, Q
+        return np.array([I]), np.array([Q])
 
-    def echo(self, freq_ex, freq_ro, power_ex, power_ro, t_wait, t_ex=1e-6, channel_ro='CH1'):
+    def echo(self, freq_ex, freq_ro, power_ex, power_ro, t_wait, t_ex, amp_ex, channel_ro='CH1'):
         '''
             Do a echo measurement using the redpitaya and two microwave sources. 
             Input:
                 - freq_ex (float)    : vector of frequency to be played by the excitation source in GHz
                 - freq_ro (float)     : readout frequency to be played by the readout source in GHz
-                - power_ro (float)    : power of the readout source in dB 
                 - power_ex (float)    : power of the excitation source in dB
+                - power_ro (float)    : power of the readout source in dB 
                 - t_wait (float)      : time to wait between the two excitations in second
                 - t_ex (float)        : duration of the excitation in second, if 0 one do not use the SSB
                   for the excitation but directly the microwave source 
@@ -1120,55 +1031,67 @@ class VI_rp(Instrument):
             - Q (float) : vector of Q quadrature
         '''
 
-        self._microwave_generator1.set_gui_update('OFF')
-        self._microwave_generator2.set_gui_update('OFF')
-
-        self._microwave_generator1.set_freqsweep('off')
-        self.set_src1_cw_frequency(freq_ro)
-        self._microwave_generator1.set_power(power_ro)
+        # --- preparation of the microwave source 
+        self._microwave_generator1.set_gui_update('on')
+        self._microwave_generator2.set_gui_update('on')
         
+        self._microwave_generator1.set_freqsweep('off')
         self._microwave_generator2.set_freqsweep('off')
+        
+        self.set_src1_cw_frequency(freq_ro)
         self.set_src2_cw_frequency(freq_ex)
+        
+        self._microwave_generator1.set_power(power_ro)
         self._microwave_generator2.set_power(power_ex)
+        
+        self._microwave_generator1.set_gui_update('off')
+        self._microwave_generator2.set_gui_update('off')
 
-        """           !!!!!!!!!!!!!!!!!!!!!              TO BE CHECKED          !!!!!!!!!!!!!!!!!                   """
-        # self._microwave_generator2.set_power(self._SSB_tone2.get_LO_power())
+        # --- generate the LUT 
+        table_sin_ro = self._redpitaya.fill_LUT('SIN',[self._ro_pulse_frequency, self._ro_pulse_amplitude,
+                                                       self._ro_pulse_duration, 4 * t_ex + 2 * t_wait])
+        table_sin_IQ = self._redpitaya.fill_LUT('SIN', [self._ro_pulse_frequency, 1,
+                                                       self._ro_pulse_duration,0])
+        table_cos_IQ = self._redpitaya.fill_LUT('COS', [self._ro_pulse_frequency, 1,
+                                                        self._ro_pulse_duration,0])
+        table_sin_ex = self._redpitaya.fill_LUT('ECHO', [self._ro_pulse_frequency, amp_ex, t_ex, t_wait, 0])
 
-        table_sin_ro = self._redpitaya.fill_LUT('SIN', [self._ro_pulse_frequency, self._ro_pulse_amplitude,
-                                                        self._ro_pulse_duration, 4 * t_ex + 2*t_wait +
-                                                        self._ro_pulse_delay_trigger + self._ro_pulse_delay_IQ])
-        table_cos_ro = self._redpitaya.fill_LUT('COS', [self._ro_pulse_frequency, self._ro_pulse_amplitude,
-                                                        self._ro_pulse_duration, 4 * t_ex + 2*t_wait +
-                                                        self._ro_pulse_delay_trigger + self._ro_pulse_delay_IQ])
-        table_sin_ex = self._redpitaya.fill_LUT('RAMSEY', [self._ro_pulse_frequency, self._ro_pulse_amplitude,
-                                                           t_ex, self._ro_pulse_delay_trigger, t_wait])
+        # --- set the period and the ADC/DAC parameters 
+        time_step = 4 * t_ex + 2 * t_wait + self._ro_pulse_duration 
+        period = self._period_min + time_step
+        self.set_period(period)
+        self._redpitaya.set_stop_DAC(time_step)
+        self._redpitaya.set_start_ADC(4 * t_ex + 2 * t_wait + self._ro_pulse_delay)
+        self._redpitaya.set_stop_ADC(time_step + self._ro_pulse_delay)
 
+        # --- reset and fill the LUT()
         self._redpitaya.reset_LUT()
-        self._redpitaya.send_DAC_LUT(table_sin_ro, channel_ro, trigger=channel_ro)
-        if channel_ro == 'CH1':
-            self._redpitaya.send_DAC_LUT(table_sin_ex, 'CH2', trigger='CH2')
-        elif channel_ro == 'CH2':
-            self._redpitaya.send_DAC_LUT(table_sin_ex, 'CH1', trigger='CH1')
-        else:
-            raise ValueError('Problem with the channel choice in twotone, it should be CH1 or CH2')
+        self._redpitaya.send_DAC_LUT(table_sin_ro, channel_ro)
 
-        self._redpitaya.send_IQ_LUT(table_cos_ro, channel_ro, quadrature='I')
-        self._redpitaya.send_IQ_LUT(table_sin_ro, channel_ro, quadrature='Q')
+        if channel_ro == 'CH1': 
+            self._redpitaya.send_DAC_LUT(table_sin_ex, 'CH2')
+        elif channel_ro == 'CH2': 
+            self._redpitaya.send_DAC_LUT(table_sin_ex, 'CH1')
+            
+        self._redpitaya.send_IQ_LUT(table_cos_IQ, channel_ro, quadrature='I')
+        self._redpitaya.send_IQ_LUT(table_sin_IQ, channel_ro, quadrature='Q')
+        
+        # --- take the data for the frequency vector 
 
-        data = self._redpitaya.get_data(mode='IQINT', nb_measure=average)
+        data = self._redpitaya.get_data(mode='IQINT', nb_measure=self._nb_point_avg)
+        
+        if channel_ro == 'CH1': 
+            I= np.mean(data[0])/(self._ro_pulse_duration/8e-9)
+            Q = np.mean(data[1])/(self._ro_pulse_duration/8e-9)
+        
+        elif channel_ro == 'CH2': 
+            I = np.mean(data[2])/(self._ro_pulse_duration/8e-9)
+            Q = np.mean(data[3])/(self._ro_pulse_duration/8e-9)
+        
+        else: 
+            raise ValueError('For one tone the option are CH1 or CH2')
 
-        nb_points = (self._ro_pulse_duration + self._ro_pulse_delay + 4*t_ex + 2*t_wait) / 8e-9
-
-        if channel_ro == 'CH1':
-            ICH1 = data[::4] / 4 / nb_points / 8192.
-            QCH1 = data[1::4] / 4 / nb_points / 8192.
-            return np.array([ICH1, QCH1])
-        elif channel_ro == 'CH2':
-            ICH2 = data[2::4] / 4 / nb_points / 8192.
-            QCH2 = data[3::4] / 4 / nb_points / 8192.
-            return np.array([ICH2, QCH2])
-        else:
-            raise ValueError('Wrong channel name in the echo sequence')
+        return np.array([I]), np.array([Q])
 
     def rabi_sequence(self,freq_ex,freq_ro, power_ex, power_ro, t_ex_vec,amp_ex, channel_ro = 'CH1'):
 
@@ -1193,23 +1116,25 @@ class VI_rp(Instrument):
             Q_vec = np.concatenate((Q_vec, Q))
         return I_vec,Q_vec
 
-    def ramsey_sequence(self,freq_ex,freq_ro, power_ex, power_ro, t_wait_vec, t_ex, channel_ro = 'CH1', average = 100):
+    def ramsey_sequence(self,freq_ex,freq_ro, power_ex, power_ro, t_wait_vec, t_ex, amp_ex, channel_ro = 'CH1'):
 
         I_vec = np.array([])
         Q_vec = np.array([])
         for k in xrange(len(t_wait_vec)):
-            I, Q = self.ramsey(self,freq_ex,freq_ro, power_ex, power_ro, t_wait_vec[k], t_ex, channel_ro, average)
-            I_vec = np.concatenate((I_vec, np.mean(I)))
-            Q_vec = np.concatenate((Q_vec, np.mean(Q)))
+            print str(t_wait_vec[k]*1e6)
+            I, Q = self.ramsey(freq_ex,freq_ro, power_ex, power_ro, t_wait_vec[k], t_ex, amp_ex, channel_ro)
+            I_vec = np.concatenate((I_vec, I))
+            Q_vec = np.concatenate((Q_vec, Q))
         return I_vec, Q_vec
 
-    def echo_sequence(self, freq_ex, freq_ro, power_ex, power_ro, t_wait_vec, t_ex, channel_ro='CH1', average=100):
+    def echo_sequence(self, freq_ex, freq_ro, power_ex, power_ro, t_wait_vec, t_ex, amp_ex, channel_ro='CH1'):
         I_vec = np.array([])
         Q_vec = np.array([])
         for k in xrange(len(t_wait_vec)):
-            I, Q = self.echo(self, freq_ex, freq_ro, power_ex, power_ro, t_wait_vec[k], t_ex, channel_ro, average)
-            I_vec = np.concatenate((I_vec, np.mean(I)))
-            Q_vec = np.concatenate((Q_vec, np.mean(Q)))
+            print str(t_wait_vec[k]*1e6)
+            I, Q = self.echo(freq_ex, freq_ro, power_ex, power_ro, t_wait_vec[k], t_ex, amp_ex, channel_ro)
+            I_vec = np.concatenate((I_vec, I))
+            Q_vec = np.concatenate((Q_vec, Q))
         return I_vec, Q_vec
 
     def average_one_tone(self, freq_vec, power_mw, channel, average):
@@ -1308,26 +1233,29 @@ class VI_rp(Instrument):
         
         return  I_avg, Q_avg
     
-    def average_ramsey(self,freq_ex,freq_ro, power_ex, power_ro, t_wait_vec, t_ex, channel_ro = 'CH1', average = 100):
+    def average_ramsey(self,freq_ex,freq_ro, power_ex, power_ro, t_wait_vec, t_ex, amp_ex, channel_ro = 'CH1', average = 100):
 
         I_avg = []
         Q_avg = []
         for k in xrange(average):
-            data = self.ramsey_sequence(self,freq_ex,freq_ro, power_ex, power_ro, t_wait_vec, t_ex, channel_ro)
+            print 'Average: '+ str(k)
+            data = self.ramsey_sequence(freq_ex,freq_ro, power_ex, power_ro, t_wait_vec, t_ex, amp_ex, channel_ro)
             I_avg.append(data[0])
             Q_avg.append(data[1])
-        I_avg = np.mean(np.array([I_avg]), axis=0)
-        Q_avg = np.mean(np.array([Q_avg]), axis=0)
-        return np.mean(I_avg, axis=0), np.mean(Q_avg, axis=0)
+        I_avg = np.mean(I_avg, axis=0)
+        Q_avg = np.mean(Q_avg, axis=0)
+        
+        return I_avg, Q_avg
 
-    def average_echo(self, freq_ex, freq_ro, power_ex, power_ro, t_wait_vec, t_ex, channel_ro='CH1', average=100):
-
+    def average_echo(self, freq_ex, freq_ro, power_ex, power_ro, t_wait_vec, t_ex, amp_ex, channel_ro='CH1', average=100):
         I_avg = []
         Q_avg = []
         for k in xrange(average):
-            data = self.echo_sequence(self, freq_ex, freq_ro, power_ex, power_ro, t_wait_vec, t_ex, channel_ro)
+            print 'Average: '+ str(k)
+            data = self.echo_sequence(freq_ex, freq_ro, power_ex, power_ro, t_wait_vec, t_ex, amp_ex, channel_ro)
             I_avg.append(data[0])
             Q_avg.append(data[1])
-        I_avg = np.mean(np.array([I_avg]), axis=0)
-        Q_avg = np.mean(np.array([Q_avg]), axis=0)
-        return np.mean(I_avg, axis=0), np.mean(Q_avg, axis=0)
+        I_avg = np.mean(I_avg, axis=0)
+        Q_avg = np.mean(Q_avg, axis=0)
+
+        return I_avg, Q_avg
